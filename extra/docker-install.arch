@@ -12,7 +12,7 @@ fn_refresh() {
 }
 
 fn_update() {
-	if [ "${USE_YAOURT}" == "Y" ]; then
+	if [ "${USE_YAOURT}" = "Y" ]; then
 		yaourt -Sua --noconfirm ${@}
 	else
 		pacman -Su --noconfirm --quiet ${@}
@@ -20,11 +20,15 @@ fn_update() {
 }
 
 fn_install() {
-	if [ "${USE_YAOURT}" == "Y" ]; then
+	if [ "${USE_YAOURT}" = "Y" ]; then
 		yaourt -S --noconfirm ${@}
 	else
 		pacman -S --noconfirm --quiet ${@}
 	fi
+}
+
+fn_del() {
+	pacman -Rsn --noconfirm ${@}
 }
 
 fn_yaourt_start() {
@@ -51,7 +55,7 @@ fn_yaourt_start() {
 }
 
 fn_yaourt_end() {
-	[ "${prev_makepkg_mod}" == "Y" ] && sed -i 's/if (( EUID == -1 ))/if (( EUID == 0 ))/g' /usr/bin/makepkg
+	[ "${prev_makepkg_mod}" = "Y" ] && sed -i 's/if (( EUID == -1 ))/if (( EUID == 0 ))/g' /usr/bin/makepkg
 }
 
 fn_clean() {
@@ -78,7 +82,7 @@ fn_clean() {
 	fi
 	rm -rf /etc/pacman.d/mirrorlist.pacnew
 	echo -e "Y\nY" | pacman -Scc &> /dev/null
-	rm -rf /var/cache/pacman/pkg/* /var/lib/pacman/sync/* /tmp/yaourt-tmp-*
+	rm -rf /var/log/pacman.log /var/cache/pacman/pkg/* /var/lib/pacman/sync/* /tmp/yaourt-tmp-*
 }
 
 
@@ -95,6 +99,7 @@ fi
 USE_YAOURT=N
 PARAM_REFRESH=N
 PARAM_UPDATE=N
+PARAM_DEL=N
 PARAM_CLEAN=N
 PARAM_EXTRA=()
 PACKAGES=()
@@ -106,6 +111,7 @@ do
 		-y|--yaourt) USE_YAOURT=Y ;;
 		-r|--refresh) PARAM_REFRESH=Y ;;
 		-u|--update) PARAM_UPDATE=Y ;;
+		-d|--del) PARAM_DEL=Y ;;
 		-c|--cean) PARAM_CLEAN=Y ;;
 		--asdeps) PARAM_EXTRA+=(--asdeps) ;;
 		--asexplicit) PARAM_EXTRA+=(--asexplicit) ;;
@@ -115,33 +121,37 @@ do
 	shift
 done
 
-if [ "${PARAM_REFRESH}" == "Y" ]; then
+if [ "${PARAM_REFRESH}" = "Y" ]; then
 	fn_refresh
-elif [ "${PARAM_UPDATE}" == "Y" ]; then
+elif [ "${PARAM_UPDATE}" = "Y" ]; then
 	fn_refresh
-elif [ "${USE_YAOURT}" == "Y" -a ! -e /var/lib/pacman/sync/core.db ]; then
+elif [ "${USE_YAOURT}" = "Y" -a ! -e /var/lib/pacman/sync/core.db ]; then
 	fn_refresh
 elif [ ! -z "${PACKAGES}" -a ! -e /var/lib/pacman/sync/core.db ]; then
 	fn_refresh
 fi
 
-if [ "${USE_YAOURT}" == "Y" ]; then
+if [ "${USE_YAOURT}" = "Y" ]; then
 	fn_yaourt_start
 fi
 
-if [ "${PARAM_UPDATE}" == "Y" ]; then
+if [ "${PARAM_UPDATE}" = "Y" ]; then
 	fn_update ${PARAM_EXTRA[@]}
 fi
 
 if [ ! -z "${PACKAGES}" ]; then
-	fn_install ${PARAM_EXTRA[@]} ${PACKAGES[@]}
+	if [ "${PARAM_DEL}" = "N" ]; then
+		fn_install ${PARAM_EXTRA[@]} ${PACKAGES[@]}
+	else
+		fn_del ${PARAM_EXTRA[@]} ${PACKAGES[@]}
+	fi
 fi
 
-if [ "${USE_YAOURT}" == "Y" ]; then
+if [ "${USE_YAOURT}" = "Y" ]; then
 	fn_yaourt_end
 fi
 
-if [ "${PARAM_CLEAN}" == "Y" ]; then
+if [ "${PARAM_CLEAN}" = "Y" ]; then
 	fn_clean
 fi
 

@@ -23,6 +23,10 @@ fn_install() {
 	apt-get install ${@}
 }
 
+fn_del() {
+	apt-get autoremove ${@} --purge -y
+}
+
 fn_clean() {
 	apt-get autoremove --purge
 	apt-get clean
@@ -42,6 +46,7 @@ fi
 
 PARAM_REFRESH=N
 PARAM_UPDATE=N
+PARAM_DEL=N
 PARAM_CLEAN=N
 PARAM_EXTRA=()
 PACKAGES=()
@@ -52,6 +57,7 @@ do
 		-h|--help) fn_usage ;;
 		-r|--refresh) PARAM_REFRESH=Y ;;
 		-u|--update) PARAM_UPDATE=Y ;;
+		-d|--del) PARAM_DEL=Y ;;
 		-c|--cean) PARAM_CLEAN=Y ;;
 		-o) PARAM_EXTRA+=(${1} ${2}) ; shift ;;
 		*) PACKAGES+=(${1}) ;;
@@ -59,23 +65,27 @@ do
 	shift
 done
 
-if [ "${PARAM_REFRESH}" == "Y" ]; then
+if [ "${PARAM_REFRESH}" = "Y" ]; then
 	fn_refresh ${PARAM_EXTRA[@]}
-elif [ "${PARAM_UPDATE}" == "Y" ]; then
+elif [ "${PARAM_UPDATE}" = "Y" ]; then
 	fn_refresh ${PARAM_EXTRA[@]}
 elif [ ! -z "${PACKAGES}" -a -z "$(ls /var/lib/apt/lists/* 2> /dev/null)" ]; then
 	fn_refresh ${PARAM_EXTRA[@]}
 fi
 
-if [ "${PARAM_UPDATE}" == "Y" ]; then
+if [ "${PARAM_UPDATE}" = "Y" ]; then
 	fn_update ${PARAM_EXTRA[@]}
 fi
 
 if [ ! -z "${PACKAGES}" ]; then
-	fn_install ${PARAM_EXTRA[@]} ${PACKAGES[@]}
+	if [ "${PARAM_DEL}" = "N" ]; then
+		fn_install ${PARAM_EXTRA[@]} ${PACKAGES[@]}
+	else
+		fn_del ${PARAM_EXTRA[@]} ${PACKAGES[@]}
+	fi
 fi
 
-if [ "${PARAM_CLEAN}" == "Y" ]; then
+if [ "${PARAM_CLEAN}" = "Y" ]; then
 	fn_clean
 fi
 

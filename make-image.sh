@@ -137,7 +137,13 @@ EOF
 	echo "${PACMAN_MIRRORLIST}" > ${TARGET_OUTPUT}/etc/pacman.d/mirrorlist || (echo "config failed : mirrorlist" ; exit 1)
 	sed -i "s/\(Architecture =\) auto/\1 ${ARCH_ARCH}/g" ${TARGET_OUTPUT}/etc/pacman.conf || (echo "config failed : pacman.conf" ; exit 1)
 	sed -i "s/#\(NoUpgrade   =\)/\1 \/etc\/pacman.d\/mirrorlist/g" ${TARGET_OUTPUT}/etc/pacman.conf || (echo "config failed : pacman.conf" ; exit 1)
-	arch-chroot ${TARGET_OUTPUT} /bin/sh -c "pacman-key --init; pacman-key --populate ${ARCH_KEYRING}; pkill gpg-agent; locale-gen" || (echo "config failed : chroot" ; exit 1)
+	if [ "${TARGET_ARCH}" = "armv7h" -o "${TARGET_ARCH}" = "armv6h" -o "${TARGET_ARH}" = "arm" ]; then
+		QEMU_EXECVE=1 arch-chroot ${TARGET_OUTPUT} /usr/bin/qemu-arm-static -execve -0 /bin/sh /bin/sh -c "pacman-key --init; pacman-key --populate ${ARCH_KEYRING}; pkill gpg-agent; locale-gen" || (echo "config failed : chroot" ; exit 1)
+	elif [ "${TARGET_ARCH}" = "aarch64" ]; then
+		QEMU_EXECVE=1 arch-chroot ${TARGET_OUTPUT} /usr/bin/qemu-aarch64-static -execve -0 /bin/sh /bin/sh -c "pacman-key --init; pacman-key --populate ${ARCH_KEYRING}; pkill gpg-agent; locale-gen" || (echo "config failed : chroot" ; exit 1)
+	else
+		arch-chroot ${TARGET_OUTPUT} /bin/sh -c "pacman-key --init; pacman-key --populate ${ARCH_KEYRING}; pkill gpg-agent; locale-gen" || (echo "config failed : chroot" ; exit 1)
+	fi
 
 	#x64 multilib
 	#if [ "${TARGET_ARCH}" == "x64" ]; then
@@ -149,11 +155,25 @@ EOF
 	if [ -e extra/package-query-*-${ARCH_ARCH}.pkg.tar.xz -a -e extra/yaourt-*-any.pkg.tar.xz ]; then
 		cp extra/package-query-*-${ARCH_ARCH}.pkg.tar.xz ${TARGET_OUTPUT}/
 		cp extra/yaourt-*-any.pkg.tar.xz ${TARGET_OUTPUT}/
-		arch-chroot ${TARGET_OUTPUT} /bin/sh -c "pacman -U --noconfirm --asdeps /package-query-*; pacman -U --noconfirm /yaourt-*-any.pkg.tar.xz" || (echo "config failed : yaourt" ; exit 1)
+		if [ "${TARGET_UPDATE}" = "Y" ]; then
+			if [ "${TARGET_ARCH}" = "armv7h" -o "${TARGET_ARCH}" = "armv6h" -o "${TARGET_ARH}" = "arm" ]; then
+				QEMU_EXECVE=1 arch-chroot ${TARGET_OUTPUT} /usr/bin/qemu-arm-static -execve -0 /bin/sh /bin/sh -c "pacman -U --noconfirm --asdeps /package-query-*; pacman -U --noconfirm /yaourt-*-any.pkg.tar.xz" || (echo "config failed : yaourt" ; exit 1)
+			elif [ "${TARGET_ARCH}" = "aarch64" ]; then
+				QEMU_EXECVE=1 arch-chroot ${TARGET_OUTPUT} /usr/bin/qemu-aarch64-static -execve -0 /bin/sh /bin/sh -c "pacman -U --noconfirm --asdeps /package-query-*; pacman -U --noconfirm /yaourt-*-any.pkg.tar.xz" || (echo "config failed : yaourt" ; exit 1)
+			else
+				arch-chroot ${TARGET_OUTPUT} /bin/sh -c "pacman -U --noconfirm --asdeps /package-query-*; pacman -U --noconfirm /yaourt-*-any.pkg.tar.xz" || (echo "config failed : yaourt" ; exit 1)
+			fi
+		fi
 		rm -rf ${TARGET_OUTPUT}/*.pkg.tar.xz
 	fi
 
-	arch-chroot ${TARGET_OUTPUT} /bin/sh -c "echo -e 'Y\nY' | pacman -Scc" || (echo "config failed : pacman -Scc" ; exit 1)
+	if [ "${TARGET_ARCH}" = "armv7h" -o "${TARGET_ARCH}" = "armv6h" -o "${TARGET_ARH}" = "arm" ]; then
+		QEMU_EXECVE=1 arch-chroot ${TARGET_OUTPUT} /usr/bin/qemu-arm-static -execve -0 /bin/sh /bin/sh -c "echo -e 'Y\nY' | pacman -Scc" || (echo "config failed : pacman -Scc" ; exit 1)
+	elif [ "${TARGET_ARCH}" = "aarch64" ]; then
+		QEMU_EXECVE=1 arch-chroot ${TARGET_OUTPUT} /usr/bin/qemu-aarch64-static -execve -0 /bin/sh /bin/sh -c "echo -e 'Y\nY' | pacman -Scc" || (echo "config failed : pacman -Scc" ; exit 1)
+	else
+		arch-chroot ${TARGET_OUTPUT} /bin/sh -c "echo -e 'Y\nY' | pacman -Scc" || (echo "config failed : pacman -Scc" ; exit 1)
+	fi
 
 	rm -rf "${PACMAN_CONF}"
 
@@ -171,7 +191,7 @@ makealpine() {
 	fi
 
 	local ALPINE_DIST=edge
-	local ALPINE_MIRROR=http://nl.alpinelinux.org/alpine
+	local ALPINE_MIRROR=http://dl-cdn.alpinelinux.org/alpine
 
 	local ALPINE_ARCH=${TARGET_ARCH}
 	ALPINE_ARCH=${ALPINE_ARCH/x64/x86_64}
@@ -218,7 +238,13 @@ EOF
 
 	#timezone
 	echo "${TARGET_TIMEZONE}" > ${TARGET_OUTPUT}/etc/TZ
-	PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" chroot "${TARGET_OUTPUT}" /bin/sh -c "apk update ; setup-timezone -z Asia/Seoul"
+	if [ "${TARGET_ARCH}" = "armv7h" -o "${TARGET_ARCH}" = "armv6h" -o "${TARGET_ARH}" = "arm" ]; then
+		QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" chroot "${TARGET_OUTPUT}" /usr/bin/qemu-arm-static -execve -0 /bin/sh /bin/sh -c "apk update ; setup-timezone -z Asia/Seoul"
+	elif [ "${TARGET_ARCH}" = "aarch64" ]; then
+		QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" chroot "${TARGET_OUTPUT}" /usr/bin/qemu-aarch64-static -execve -0 /bin/sh /bin/sh -c "apk update ; setup-timezone -z Asia/Seoul"
+	else
+		PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" chroot "${TARGET_OUTPUT}" /bin/sh -c "apk update ; setup-timezone -z Asia/Seoul"
+	fi
 
 	rm -rf ${TARGET_OUTPUT}/sbin/apk.static
 	rm -rf ${TARGET_OUTPUT}/var/cache/apk/*
@@ -314,9 +340,17 @@ makedebiancommon() {
 			fi
 		fi
 
-		PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C DEBIAN_FRONTEND=noninteractive chroot "${TARGET_OUTPUT}" /debootstrap/debootstrap --second-stage || (echo "debootstrap failed : step2" ; exit 1)
+		if [ "${TARGET_ARCH}" = "armv7h" -o "${TARGET_ARCH}" = "armv6h" -o "${TARGET_ARH}" = "arm" ]; then
+			QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C DEBIAN_FRONTEND=noninteractive chroot "${TARGET_OUTPUT}" /usr/bin/qemu-arm-static -execve -0 /bin/sh /bin/sh -c "/debootstrap/debootstrap --second-stage" || (echo "debootstrap failed : step2" ; exit 1)
+			QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true chroot "${TARGET_OUTPUT}" /usr/bin/qemu-arm-static -execve -0 /bin/sh /bin/sh -c "dpkg --configure -a" || (echo "debootstrap failed : step3" ; exit 1)
+		elif [ "${TARGET_ARCH}" = "aarch64" ]; then
+			QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C DEBIAN_FRONTEND=noninteractive chroot "${TARGET_OUTPUT}" /usr/bin/qemu-aarch64-static -execve -0 /bin/sh /bin/sh -c "/debootstrap/debootstrap --second-stage" || (echo "debootstrap failed : step2" ; exit 1)
+			QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true chroot "${TARGET_OUTPUT}" /usr/bin/qemu-aarch64-static -execve -0 /bin/sh /bin/sh -c "dpkg --configure -a" || (echo "debootstrap failed : step3" ; exit 1)
+		else
+			PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C DEBIAN_FRONTEND=noninteractive chroot "${TARGET_OUTPUT}" /debootstrap/debootstrap --second-stage || (echo "debootstrap failed : step2" ; exit 1)
+			PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true chroot "${TARGET_OUTPUT}" dpkg --configure -a || (echo "debootstrap failed : step3" ; exit 1)
+		fi
 
-		PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true chroot "${TARGET_OUTPUT}" dpkg --configure -a || (echo "debootstrap failed : step3" ; exit 1)
 	fi
 
 	#resolve
@@ -338,7 +372,13 @@ EOF
 	#skel
 	cp -ar ${TARGET_OUTPUT}/etc/skel/. ${TARGET_OUTPUT}/root/
 
-	PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C chroot "${TARGET_OUTPUT}" /bin/sh -c "locale-gen"
+	if [ "${TARGET_ARCH}" = "armv7h" -o "${TARGET_ARCH}" = "armv6h" -o "${TARGET_ARH}" = "arm" ]; then
+		QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C chroot "${TARGET_OUTPUT}" /usr/bin/qemu-arm-static -execve -0 /bin/sh /bin/sh -c "locale-gen"
+	elif [ "${TARGET_ARCH}" = "aarch64" ]; then
+		QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C chroot "${TARGET_OUTPUT}" /usr/bin/qemu-aarch64-static -execve -0 /bin/sh /bin/sh -c "locale-gen"
+	else
+		PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C chroot "${TARGET_OUTPUT}" /bin/sh -c "locale-gen"
+	fi
 
 	#echo 'force-unsafe-io' > ${TARGET_OUTPUT}/etc/dpkg/dpkg.cfg.d/0-force-unsafe-io
 
@@ -411,7 +451,13 @@ deb ${DEBIAN_MIRROR} ${DEBIAN_DIST}-security universe
 EOF
 	fi
 
-	PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C DEBIAN_FRONTEND=noninteractive chroot "${TARGET_OUTPUT}" /bin/bash --login -c "apt-get update -o Acquire::Languages=none -o Acquire::GzipIndexes=true -o Acquire::CompressionTypes::Order::=gz -o APT::Install-Recommends=0 -o APT::Install-Suggests=0 -o APT::Get::Assume-Yes=true -o APT::Get::allow-downgrades=true -o APT::Get::allow-remove-essential=true -o APT::Get::allow-change-held-packages=true && apt-get dist-upgrade -y -o Acquire::Languages=none -o Acquire::GzipIndexes=true -o Acquire::CompressionTypes::Order::=gz -o APT::Install-Recommends=0 -o APT::Install-Suggests=0 -o APT::Get::Assume-Yes=true -o APT::Get::allow-downgrades=true -o APT::Get::allow-remove-essential=true -o APT::Get::allow-change-held-packages=true ; apt-get install apt-utils -y -o Acquire::Languages=none -o Acquire::GzipIndexes=true -o Acquire::CompressionTypes::Order::=gz -o APT::Install-Recommends=0 -o APT::Install-Suggests=0 -o APT::Get::Assume-Yes=true -o APT::Get::allow-downgrades=true -o APT::Get::allow-remove-essential=true -o APT::Get::allow-change-held-packages=true ; apt-get autoremove --purge -y ; apt-get autoclean -y ; apt-get clean ; find /var/lib/apt -type f -exec rm \"{}\" \\;"
+	if [ "${TARGET_ARCH}" = "armv7h" -o "${TARGET_ARCH}" = "armv6h" -o "${TARGET_ARH}" = "arm" ]; then
+		QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C DEBIAN_FRONTEND=noninteractive chroot "${TARGET_OUTPUT}" /usr/bin/qemu-arm-static -execve -0 /bin/sh /bin/sh -c "apt-get update -o Acquire::Languages=none -o Acquire::GzipIndexes=true -o Acquire::CompressionTypes::Order::=gz -o APT::Install-Recommends=0 -o APT::Install-Suggests=0 -o APT::Get::Assume-Yes=true -o APT::Get::allow-downgrades=true -o APT::Get::allow-remove-essential=true -o APT::Get::allow-change-held-packages=true && apt-get dist-upgrade -y -o Acquire::Languages=none -o Acquire::GzipIndexes=true -o Acquire::CompressionTypes::Order::=gz -o APT::Install-Recommends=0 -o APT::Install-Suggests=0 -o APT::Get::Assume-Yes=true -o APT::Get::allow-downgrades=true -o APT::Get::allow-remove-essential=true -o APT::Get::allow-change-held-packages=true ; apt-get install apt-utils -y -o Acquire::Languages=none -o Acquire::GzipIndexes=true -o Acquire::CompressionTypes::Order::=gz -o APT::Install-Recommends=0 -o APT::Install-Suggests=0 -o APT::Get::Assume-Yes=true -o APT::Get::allow-downgrades=true -o APT::Get::allow-remove-essential=true -o APT::Get::allow-change-held-packages=true ; apt-get autoremove --purge -y ; apt-get autoclean -y ; apt-get clean ; find /var/lib/apt -type f -exec rm \"{}\" \\;"
+	elif [ "${TARGET_ARCH}" = "aarch64" ]; then
+		QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C DEBIAN_FRONTEND=noninteractive chroot "${TARGET_OUTPUT}" /usr/bin/qemu-aarch64-static -execve -0 /bin/sh /bin/sh -c "apt-get update -o Acquire::Languages=none -o Acquire::GzipIndexes=true -o Acquire::CompressionTypes::Order::=gz -o APT::Install-Recommends=0 -o APT::Install-Suggests=0 -o APT::Get::Assume-Yes=true -o APT::Get::allow-downgrades=true -o APT::Get::allow-remove-essential=true -o APT::Get::allow-change-held-packages=true && apt-get dist-upgrade -y -o Acquire::Languages=none -o Acquire::GzipIndexes=true -o Acquire::CompressionTypes::Order::=gz -o APT::Install-Recommends=0 -o APT::Install-Suggests=0 -o APT::Get::Assume-Yes=true -o APT::Get::allow-downgrades=true -o APT::Get::allow-remove-essential=true -o APT::Get::allow-change-held-packages=true ; apt-get install apt-utils -y -o Acquire::Languages=none -o Acquire::GzipIndexes=true -o Acquire::CompressionTypes::Order::=gz -o APT::Install-Recommends=0 -o APT::Install-Suggests=0 -o APT::Get::Assume-Yes=true -o APT::Get::allow-downgrades=true -o APT::Get::allow-remove-essential=true -o APT::Get::allow-change-held-packages=true ; apt-get autoremove --purge -y ; apt-get autoclean -y ; apt-get clean ; find /var/lib/apt -type f -exec rm \"{}\" \\;"
+	else
+		PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C DEBIAN_FRONTEND=noninteractive chroot "${TARGET_OUTPUT}" /bin/sh -c "apt-get update -o Acquire::Languages=none -o Acquire::GzipIndexes=true -o Acquire::CompressionTypes::Order::=gz -o APT::Install-Recommends=0 -o APT::Install-Suggests=0 -o APT::Get::Assume-Yes=true -o APT::Get::allow-downgrades=true -o APT::Get::allow-remove-essential=true -o APT::Get::allow-change-held-packages=true && apt-get dist-upgrade -y -o Acquire::Languages=none -o Acquire::GzipIndexes=true -o Acquire::CompressionTypes::Order::=gz -o APT::Install-Recommends=0 -o APT::Install-Suggests=0 -o APT::Get::Assume-Yes=true -o APT::Get::allow-downgrades=true -o APT::Get::allow-remove-essential=true -o APT::Get::allow-change-held-packages=true ; apt-get install apt-utils -y -o Acquire::Languages=none -o Acquire::GzipIndexes=true -o Acquire::CompressionTypes::Order::=gz -o APT::Install-Recommends=0 -o APT::Install-Suggests=0 -o APT::Get::Assume-Yes=true -o APT::Get::allow-downgrades=true -o APT::Get::allow-remove-essential=true -o APT::Get::allow-change-held-packages=true ; apt-get autoremove --purge -y ; apt-get autoclean -y ; apt-get clean ; find /var/lib/apt -type f -exec rm \"{}\" \\;"
+	fi
 	
 	commonpostwork
 }
@@ -486,6 +532,14 @@ commonpostwork() {
 			cp extra/docker-install.alpine ${TARGET_OUTPUT}/usr/local/bin/docker-install
 			chown 0.0 ${TARGET_OUTPUT}/usr/local/bin/docker-install
 			chmod 755 ${TARGET_OUTPUT}/usr/local/bin/docker-install
+			if [ ! -z "${qemu}" ]; then
+				cp extra/docker-execve-check.alpine ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check
+				chown 0.0 ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check
+				chmod 755 ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check
+				cp extra/docker-execve-check.sh.alpine ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check.sh
+				chown 0.0 ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check.sh
+				chmod 755 ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check.sh
+			fi
 		fi
 		if [ "${TARGET_DISTRO}" == "debian" -o "${TARGET_DISTRO}" == "ubuntu" ]; then
 			cp extra/docker-install.deb ${TARGET_OUTPUT}/usr/local/bin/docker-install
@@ -508,24 +562,55 @@ commonpostwork() {
 		#fi
 		#docker run --rm -t ${TARGET_NAME}:latest echo Success.
 
+		#local cmd=
+		#if [ "${TARGET_DISTRO}" != "alpine" ]; then
+		#	if [ ! -z "${qemu}" ]; then
+		#		cmd="tar --numeric-owner --xattrs --acls -C ${TARGET_OUTPUT} -c . | docker import --change \"ENV LANG=${TARGET_LOCALE}\" --change \"ENV LC_ALL=${TARGET_LOCALE}\" --change \"ENV TERM=xterm\" --change \"USER root\" --change \"CMD /bin/bash --login\" --change \"ENV QEMU_EXECVE=1\" - ${TARGET_NAME}:latest"
+		#	else
+		#		cmd="tar --numeric-owner --xattrs --acls -C ${TARGET_OUTPUT} -c . | docker import --change \"ENV LANG=${TARGET_LOCALE}\" --change \"ENV LC_ALL=${TARGET_LOCALE}\" --change \"ENV TERM=xterm\" --change \"USER root\" --change \"CMD /bin/bash --login\" - ${TARGET_NAME}:latest"
+		#	fi
+		#else
+		#	if [ ! -z "${qemu}" ]; then
+		#		cmd="tar --numeric-owner --xattrs --acls -C ${TARGET_OUTPUT} -c . | docker import --change \"ENV TERM=xterm\" --change \"USER root\" --change \"CMD /bin/sh --login\" --change \"ENV QEMU_EXECVE=1\" - ${TARGET_NAME}:latest"
+		#	else
+		#		cmd="tar --numeric-owner --xattrs --acls -C ${TARGET_OUTPUT} -c . | docker import --change \"ENV TERM=xterm\" --change \"USER root\" --change \"CMD /bin/sh --login\" - ${TARGET_NAME}:latest"
+		#	fi
+		#fi
+		#echo
+		#echo "COMMAND : ${cmd}"
+		#eval ${cmd}
+		#echo
+		#echo Success.
+		#echo
+
+		#import
 		local cmd=
-		if [ "${TARGET_DISTRO}" != "alpine" ]; then
-			if [ ! -z "${qemu}" ]; then
-				cmd="tar --numeric-owner --xattrs --acls -C ${TARGET_OUTPUT} -c . | docker import --change \"ENV LANG=${TARGET_LOCALE}\" --change \"ENV LC_ALL=${TARGET_LOCALE}\" --change \"ENV TERM=xterm\" --change \"USER root\" --change \"CMD /bin/bash --login\" --change \"ENV QEMU_EXECVE=1\" - ${TARGET_NAME}:latest"
+		local shell=
+		if [ -e "${TARGET_OUTPUT}/bin/bash" ]; then
+			shell=/bin/bash
+		else
+			shell=/bin/sh
+		fi
+
+		if [ -e "${TARGET_OUTPUT}/etc/alpine-release" ]; then
+			if [ "${TARGET_ARCH}" != "x64" -a "${TARGET_ARCH}" != "x86" ] ; then
+				#cmd="tar --numeric-owner --xattrs --acls -C ${TARGET_OUTPUT} -c . | docker import --change \"USER root\" --change \"CMD ${shell} --login\" --change \"ENV QEMU_EXECVE=1\" - ${TARGET_NAME}:latest"
+				cmd="tar --numeric-owner --xattrs --acls -C ${TARGET_OUTPUT} -c . | docker import --change \"ENTRYPOINT ${shell}\" --change \"ENV QEMU_EXECVE=1\" - ${TARGET_NAME}:latest"
 			else
-				cmd="tar --numeric-owner --xattrs --acls -C ${TARGET_OUTPUT} -c . | docker import --change \"ENV LANG=${TARGET_LOCALE}\" --change \"ENV LC_ALL=${TARGET_LOCALE}\" --change \"ENV TERM=xterm\" --change \"USER root\" --change \"CMD /bin/bash --login\" - ${TARGET_NAME}:latest"
+				#cmd="tar --numeric-owner --xattrs --acls -C ${TARGET_OUTPUT} -c . | docker import --change \"USER root\" --change \"CMD ${shell} --login\" - ${TARGET_NAME}:latest"
+				cmd="tar --numeric-owner --xattrs --acls -C ${TARGET_OUTPUT} -c . | docker import --change \"ENTRYPOINT ${shell}\" - ${TARGET_NAME}:latest"
 			fi
 		else
-			if [ ! -z "${qemu}" ]; then
-				cmd="tar --numeric-owner --xattrs --acls -C ${TARGET_OUTPUT} -c . | docker import --change \"ENV TERM=xterm\" --change \"USER root\" --change \"CMD /bin/sh --login\" --change \"ENV QEMU_EXECVE=1\" - ${TARGET_NAME}:latest"
+			if [ "${TARGET_ARCH}" != "x64" -a "${TARGET_ARCH}" != "x86" ] ; then
+				#cmd="tar --numeric-owner --xattrs --acls -C ${TARGET_OUTPUT} -c . | docker import --change \"ENV LANG=${TARGET_LOCALE}\" --change \"ENV LC_ALL=${TARGET_LOCALE}\" --change \"ENV TERM=xterm\" --change \"USER root\" --change \"CMD ${shell} --login\" --change \"ENV QEMU_EXECVE=1\" - ${TARGET_NAME}:latest"
+				cmd="tar --numeric-owner --xattrs --acls -C ${TARGET_OUTPUT} -c . | docker import --change \"ENTRYPOINT ${shell}\" --change \"ENV QEMU_EXECVE=1\" - ${TARGET_NAME}:latest"
 			else
-				cmd="tar --numeric-owner --xattrs --acls -C ${TARGET_OUTPUT} -c . | docker import --change \"ENV TERM=xterm\" --change \"USER root\" --change \"CMD /bin/sh --login\" - ${TARGET_NAME}:latest"
+				cmd="tar --numeric-owner --xattrs --acls -C ${TARGET_OUTPUT} -c . | docker import --change \"ENTRYPOINT ${shell}\" - ${TARGET_NAME}:latest"
 			fi
 		fi
 		echo
 		echo "COMMAND : ${cmd}"
 		eval ${cmd}
-		echo
 		echo Success.
 		echo
 	fi

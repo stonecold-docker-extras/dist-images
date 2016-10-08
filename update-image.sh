@@ -14,13 +14,13 @@ if [ "$(uname -m)" != "x86_64" ]; then
 fi
 
 fn_usage() {
-	echo "Usage : $(basename "${0}") [-d distro] [-a architecture] [-o output] [-l locale] [-z timezone] [-u] [-i]"
+	echo "Usage : $(basename "${0}") [-d distro] [-a architecture] [-o output] [-l locale] [-z timezone] [-s] [-i]"
 	echo "          [-d distro] : arch,alpine,debian,ubuntu (default : arch)"
 	echo "          [-a architecture] : x64(x86_64),x86(i686),armv5(arm),armv6h,armv7h,aarch64 (default : x64)"
 	echo "          [-o output] : output dir (default : distro_archtecture)"
 	echo "          [-l locale] : locale (default : ko_KR.UTF-8)"
 	echo "          [-z timezone] : timezone (default : Asia/Seoul)"
-	echo "          [-u] : image update"
+	echo "          [-s] : skip image update"
 	echo "          [-i] : import docker"
 	echo ""
 	echo "          docker additional options:"
@@ -51,7 +51,7 @@ do
 		-o|--out|--output) TAGET_OUTPUT="${2}" ; shift 1 ;;
 		-l|--locale) TARGET_LOCALE="${2}" ; shift 1 ;;
 		-n|--name) TARGET_NAME="${2}" ; shift 1 ;;
-		-u|--update) TARGET_UPDATE="Y" ;;
+		-s|--skip) TARGET_UPDATE="N" ;;
 		-i|--import) TARGET_IMPORT="Y" ;;
 		-f|--force) FORCE="Y" ;;
 		-h|--help) fn_usage ;;
@@ -86,8 +86,8 @@ fi
 if [ -z "${TARGET_NAME}" ]; then
 	TARGET_NAME=forumi0721/${TARGET_DISTRO}-${TARGET_ARCH}-base
 fi
-if [ "${TARGET_UPDATE}" != "Y" ]; then
-	TARGET_UPDATE="N"
+if [ "${TARGET_UPDATE}" != "N" ]; then
+	TARGET_UPDATE="Y"
 fi
 if [ "${TARGET_IMPORT}" != "Y" ]; then
 	TARGET_IMPORT="N"
@@ -152,10 +152,30 @@ elif [ -e "${TARGET_OUTPUT}/etc/os-release" -a ! -z "$(grep "ID=ubuntu" "${TARGE
 	cp -f extra/docker-install.deb ${TARGET_OUTPUT}/usr/local/bin/docker-install
 elif [ -e "${TARGET_OUTPUT}/etc/alpine-release" ]; then
 	cp -f extra/docker-install.alpine ${TARGET_OUTPUT}/usr/local/bin/docker-install
+	if [ -e "${TARGET_OUTPUT}/usr/bin/qemu-arm-static" ]; then
+		cp extra/docker-execve-check.alpine ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check
+		chown 0.0 ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check
+		chmod 755 ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check
+		cp extra/docker-execve-check.sh.alpine ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check.sh
+		chown 0.0 ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check.sh
+		chmod 755 ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check.sh
+	fi
 fi
 
 #update
+prev_md5=
+post_md5=
 if [ "${TARGET_UPDATE}" = "Y" ]; then
+	if [ -e "${TARGET_OUTPUT}/etc/arch-release" ]; then
+		prev_md5=$(tar -cf - ${TARGET_OUTPUT}/var/lib/pacman/local 2> /dev/null | md5sum | cut -f 1 -d ' ')
+	elif [ -e "${TARGET_OUTPUT}/etc/os-release" -a ! -z "$(grep "ID=debian" "${TARGET_OUTPUT}/etc/os-release")" ]; then
+		prev_md5=$(tar -cf - ${TARGET_OUTPUT}/var/lib/dpkg/info 2> /dev/null | md5sum | cut -f 1 -d ' ')
+	elif [ -e "${TARGET_OUTPUT}/etc/os-release" -a ! -z "$(grep "ID=ubuntu" "${TARGET_OUTPUT}/etc/os-release")" ]; then
+		prev_md5=$(tar -cf - ${TARGET_OUTPUT}/var/lib/dpkg/info 2> /dev/null | md5sum | cut -f 1 -d ' ')
+	elif [ -e "${TARGET_OUTPUT}/etc/alpine-release" ]; then
+		prev_md5=$(md5sum ${TARGET_OUTPUT}/lib/apk/db/installed | cut -f 1 -d ' ')
+	fi
+	
 	if [ "${TARGET_ARCH}" = "armv7h" -o "${TARGET_ARCH}" = "armv6h" -o "${TARGET_ARH}" = "arm" ]; then
 		QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C arch-chroot "${TARGET_OUTPUT}" /usr/bin/qemu-arm-static -execve -0 /bin/sh /bin/sh -c "docker-install -r -u -c"
 	elif [ "${TARGET_ARCH}" = "aarch64" ]; then
@@ -163,7 +183,37 @@ if [ "${TARGET_UPDATE}" = "Y" ]; then
 	else
 		PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C arch-chroot "${TARGET_OUTPUT}" /bin/sh -c "docker-install -r -u -c"
 	fi
+
+	if [ -e "${TARGET_OUTPUT}/etc/arch-release" ]; then
+		post_md5=$(tar -cf - ${TARGET_OUTPUT}/var/lib/pacman/local 2> /dev/null | md5sum | cut -f 1 -d ' ')
+	elif [ -e "${TARGET_OUTPUT}/etc/os-release" -a ! -z "$(grep "ID=debian" "${TARGET_OUTPUT}/etc/os-release")" ]; then
+		post_md5=$(tar -cf - ${TARGET_OUTPUT}/var/lib/dpkg/info 2> /dev/null | md5sum | cut -f 1 -d ' ')
+	elif [ -e "${TARGET_OUTPUT}/etc/os-release" -a ! -z "$(grep "ID=ubuntu" "${TARGET_OUTPUT}/etc/os-release")" ]; then
+		post_md5=$(tar -cf - ${TARGET_OUTPUT}/var/lib/dpkg/info 2> /dev/null | md5sum | cut -f 1 -d ' ')
+	elif [ -e "${TARGET_OUTPUT}/etc/alpine-release" ]; then
+		post_md5=$(md5sum ${TARGET_OUTPUT}/lib/apk/db/installed | cut -f 1 -d ' ')
+	fi
+	echo
+
+	if [ ! -z "${prev_md5}" -a ! -z "${post_md5}" ]; then
+		echo "PREV_MD5 : ${prev_md5}"
+		echo "POST_MD5 : ${post_md5}"
+		if [ "${prev_md5}" = "${post_md5}" ]; then
+			echo "Already up-to-date"
+		else
+			echo "Distro update"
+		fi
+		echo
+	fi
 fi
+
+
+if [ -e "${TARGET_OUTPUT}/etc/os-release"  ]; then
+	if [ ! -z "$(grep 'ID=\(debian\|ubuntu\)' "${TARGET_OUTPUT}/etc/os-release")" ]; then
+		find ${TARGET_OUTPUT}/var -name \*.log -o -name \*-old -exec rm -rf "{}" \;
+	fi
+fi
+
 
 if [ "${TARGET_IMPORT}" = "Y" ]; then
 	for id in $(docker ps -a -q -f ancestor=${TARGET_NAME})
@@ -177,17 +227,27 @@ if [ "${TARGET_IMPORT}" = "Y" ]; then
 
 	#import
 	cmd=
-	if [ ! -e "${TARGET_OUTPUT}/bin/bash" ]; then
+	shell=
+	if [ -e "${TARGET_OUTPUT}/bin/bash" ]; then
+		shell=/bin/bash
+	else
+		shell=/bin/sh
+	fi
+
+	if [ -e "${TARGET_OUTPUT}/etc/alpine-release" ]; then
 		if [ "${TARGET_ARCH}" != "x64" -a "${TARGET_ARCH}" != "x86" ] ; then
-			cmd="tar --numeric-owner --xattrs --acls -C ${TARGET_OUTPUT} -c . | docker import --change \"ENV LANG=${TARGET_LOCALE}\" --change \"ENV LC_ALL=${TARGET_LOCALE}\" --change \"ENV TERM=xterm\" --change \"USER root\" --change \"CMD /bin/sh --login\" --change \"ENV QEMU_EXECVE=1\" - ${TARGET_NAME}:latest"
+			#cmd="tar --numeric-owner --xattrs --acls -C ${TARGET_OUTPUT} -c . | docker import --change \"USER root\" --change \"CMD ${shell} --login\" --change \"ENV QEMU_EXECVE=1\" - ${TARGET_NAME}:latest"
+			cmd="tar --numeric-owner --xattrs --acls -C ${TARGET_OUTPUT} -c . | docker import --change \"ENTRYPOINT ${shell}\" --change \"ENV QEMU_EXECVE=1\" - ${TARGET_NAME}:latest"
 		else
-			cmd="tar --numeric-owner --xattrs --acls -C ${TARGET_OUTPUT} -c . | docker import --change \"ENV LANG=${TARGET_LOCALE}\" --change \"ENV LC_ALL=${TARGET_LOCALE}\" --change \"ENV TERM=xterm\" --change \"USER root\" --change \"CMD /bin/sh --login\" - ${TARGET_NAME}:latest"
+			#cmd="tar --numeric-owner --xattrs --acls -C ${TARGET_OUTPUT} -c . | docker import --change \"USER root\" --change \"CMD ${shell} --login\" - ${TARGET_NAME}:latest"
+			cmd="tar --numeric-owner --xattrs --acls -C ${TARGET_OUTPUT} -c . | docker import --change \"ENTRYPOINT ${shell}\" - ${TARGET_NAME}:latest"
 		fi
 	else
 		if [ "${TARGET_ARCH}" != "x64" -a "${TARGET_ARCH}" != "x86" ] ; then
-			cmd="tar --numeric-owner --xattrs --acls -C ${TARGET_OUTPUT} -c . | docker import --change \"ENV TERM=xterm\" --change \"USER root\" --change \"CMD /bin/bash --login\" --change \"ENV QEMU_EXECVE=1\" - ${TARGET_NAME}:latest"
+			#cmd="tar --numeric-owner --xattrs --acls -C ${TARGET_OUTPUT} -c . | docker import --change \"ENV LANG=${TARGET_LOCALE}\" --change \"ENV LC_ALL=${TARGET_LOCALE}\" --change \"ENV TERM=xterm\" --change \"USER root\" --change \"CMD ${shell} --login\" --change \"ENV QEMU_EXECVE=1\" - ${TARGET_NAME}:latest"
+			cmd="tar --numeric-owner --xattrs --acls -C ${TARGET_OUTPUT} -c . | docker import --change \"ENTRYPOINT ${shell}\" --change \"ENV QEMU_EXECVE=1\" - ${TARGET_NAME}:latest"
 		else
-			cmd="tar --numeric-owner --xattrs --acls -C ${TARGET_OUTPUT} -c . | docker import --change \"ENV TERM=xterm\" --change \"USER root\" --change \"CMD /bin/bash --login\" - ${TARGET_NAME}:latest"
+			cmd="tar --numeric-owner --xattrs --acls -C ${TARGET_OUTPUT} -c . | docker import --change \"ENTRYPOINT ${shell}\" - ${TARGET_NAME}:latest"
 		fi
 	fi
 	echo
