@@ -1,0 +1,136 @@
+#!/bin/sh
+
+set -e
+
+fn_usage() {
+	cat << EOF
+$(basename ${0}) [OPTIONS...] [CONFIGURATION FILE...]
+
+Creates system user accounts.
+
+  -h --help                 Show this help
+     --version              Show package version
+     --root=PATH            Operate on an alternate filesystem root
+EOF
+	exit 0
+}
+
+fn_version() {
+	cat << EOF
+docker-wrapper
+EOF
+	exit 0
+}
+
+PARAM_ROOT=
+PARAM_EXTRA=()
+FILES=()
+
+while [ "${#}" != "0" ]
+do
+	case "${1}" in
+		-h|--help) fn_usage ;;
+		--version) fn_version ;;
+		--root*) PARAM_ROOT=${1/--root=/} ;;
+		-*) fn_usage ;;
+		*) PARAM_EXTRA+=(${1}) ;;
+	esac
+	shift 1
+done
+
+if [ -z "${PARAM_EXTRA}" ]; then
+	fn_usage
+fi
+
+for extra in ${PARAM_EXTRA[@]}
+do
+	if [ -e "${PARAM_ROOT}/usr/lib/sysusers.d/${extra}" ]; then
+		FILES+=("${PARAM_ROOT}/usr/lib/sysusers.d/${extra}")
+	fi
+done
+
+if [ -z "${FILES}" ]; then
+	for file in "${PARAM_ROOT}/usr/lib/sysusers.d/"*
+	do
+		FILES+=("${file}")
+	done
+fi
+
+for file in ${FILES[@]}
+do
+	while read -r line
+	do
+		data=()
+		eval data=(${line})
+		cmd=
+		if [ "${data[0]}" = "u" ]; then
+			if [ ! -z "${data[2]}" -a "${data[2]}" != "-" ]; then
+				if [ -z "$(getent group ${data[1]})" ]; then
+					echo "Creating group ${data[1]} with gid ${data[2]}."
+					cmd="groupadd -r"
+					if [ ! -z "${data[2]}" -a "${data[2]}" != "-" ]; then
+						cmd+=" -g '${data[2]}'"
+					fi
+					if [ ! -z "${PARAM_ROOT}" ]; then
+						cmd+=" -R '${PARAM_ROOT}'"
+					fi
+					cmd+=" ${data[1]} ; "
+				fi
+			fi
+
+			if [ -z "$(getent passwd ${data[1]})" ]; then
+				echo "Creating user ${data[1]} (${data[3]}) with uid ${data[2]} and gid ${data[2]}."
+				cmd+="useradd -r"
+				if [ ! -z "${data[3]}" -a "${data[3]}" != "-" ]; then
+					cmd+=" -c '${data[3]}'"
+				fi
+				if [ ! -z "${data[4]}" -a "${data[4]}" != "-" ]; then
+					cmd+=" -m -d '${data[4]}'"
+				else
+					cmd+=" -d /"
+				fi
+				if [ ! -z "${data[2]}" -a "${data[2]}" != "-" ]; then
+					cmd+=" -u '${data[2]}'"
+					cmd+=" -g '${data[2]}'"
+				fi
+				if [ ! -z "${PARAM_ROOT}" ]; then
+					cmd+=" -R '${PARAM_ROOT}'"
+				fi
+				cmd+=" -s /usr/bin/nologin ${data[1]}"
+			fi
+		elif [ "${data[0]}" = "g" ]; then
+			if [ -z "$(getent group ${data[1]})" ]; then
+				echo "Creating group ${data[1]} with gid ${data[2]}."
+				cmd="groupadd -r"
+				if [ ! -z "${data[2]}" -a "${data[2]}" != "-" ]; then
+					cmd+=" -g '${data[2]}'"
+				fi
+				if [ ! -z "${PARAM_ROOT}" ]; then
+					cmd+=" -R '${PARAM_ROOT}'"
+				fi
+				cmd+=" ${data[1]}"
+			fi
+		elif [ "${data[0]}" = "m" ]; then
+			if [ ! -z "$(getent passwd ${data[1]})" -a ! -z "$(getent group ${data[2]})"]; then
+				cmd="usermod -a "
+				if [ ! -z "${PARAM_ROOT}" ]; then
+					cmd+=" -R '${PARAM_ROOT}'"
+				fi
+				cmd+=" -G ${data[2]} ${data[1]}"
+			fi
+		elif [ "${data[0]}" = "r" ]; then
+			echo "not implement"
+		else
+			echo "unknown type"
+		fi
+
+		if [ ! -z "${cmd}" ]; then
+			eval "${cmd}"
+		else
+			echo "${data[@]}"
+		fi
+	done <<< "$(grep -v '^\(#\|$\)' ${file})"
+done
+
+exit 0
+

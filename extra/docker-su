@@ -1,0 +1,41 @@
+#!/bin/sh
+
+set -e
+
+if [ ! -x /usr/local/bin/docker-execve-check ]; then
+	su "$@"
+	exit $?
+fi
+
+QEMU=
+if [ ! -z "\$(grep -w -o lm /proc/cpuinfo)" ]; then
+	MACHINE=$(uname -m)
+	if [ "${MACHINE/arm/}" != "${MACHINE}" ]; then
+		if ! /usr/local/bin/docker-execve-check &> /dev/null ; then
+			QEMU=/usr/bin/qemu-arm-static
+		fi
+	elif [ "${MACHINE}" = "aarch64" ]; then
+		if ! /usr/local/bin/docker-execve-check &> /dev/null ; then
+			QEMU=/usr/bin/qemu-aarch64-static
+		fi
+	fi
+fi
+if [ ! -z "${QEMU}" ]; then
+	CMD="su"
+	while [ "${#}" != "0" ]
+	do
+		case "${1}" in
+			-c) CMD="${CMD} -c 'QEMU_EXECVE=1 ${QEMU} ${2}'" ; shift 1 ;;
+			*) CMD="${CMD} ${1}" ;;
+		esac
+		shift 1
+	done
+
+	echo "COMMAND : ${CMD}"
+	eval ${CMD}
+else
+	su "$@"
+fi
+
+exit $?
+

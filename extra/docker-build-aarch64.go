@@ -30,7 +30,7 @@ func crossBuildEnd() {
 }
 
 func runShell() error {
-	cmd := exec.Command("/usr/bin/qemu-aarch64-static", append([]string{"-0", "/bin/sh", "/bin/sh"}, os.Args[1:]...)...)
+	cmd := exec.Command("/usr/bin/qemu-aarch64-static", append([]string{"-execve", "-0", "/bin/sh", "/bin/sh"}, os.Args[1:]...)...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr

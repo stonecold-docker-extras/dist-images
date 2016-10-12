@@ -14,14 +14,16 @@ if [ "$(uname -m)" != "x86_64" ]; then
 fi
 
 fn_usage() {
-	echo "Usage : $(basename "${0}") [-d distro] [-a architecture] [-o output] [-l locale] [-z timezone] [-s] [-i]"
+	echo "Usage : $(basename "${0}") [-d distro] [-a architecture] [-o output] [-l locale] [-z timezone] [-s] [-i] [-p] [-q]"
 	echo "          [-d distro] : arch,alpine,debian,ubuntu (default : arch)"
-	echo "          [-a architecture] : x64(x86_64),x86(i686),armv5(arm),armv6h,armv7h,aarch64 (default : x64)"
+	echo "          [-a architecture] : x64(x86_64),armv7h,aarch64 (default : x64)"
 	echo "          [-o output] : output dir (default : distro_archtecture)"
 	echo "          [-l locale] : locale (default : ko_KR.UTF-8)"
 	echo "          [-z timezone] : timezone (default : Asia/Seoul)"
 	echo "          [-s] : skip image update"
 	echo "          [-i] : import docker"
+	echo "          [-p] : push image"
+	echo "          [-q] : quiet"
 	echo ""
 	echo "          docker additional options:"
 	echo "                [-n name:tag] : docker image name:tag"
@@ -38,8 +40,12 @@ TARGET_LOCALE=
 TARGET_NAME=
 TARGET_UPDATE=
 TARGET_IMPORT=
+TARGET_PUSH=
+TARGET_QEMU=
 
 FORCE=
+
+QUIET=
 
 EXTRA_ARGS=
 
@@ -53,7 +59,9 @@ do
 		-n|--name) TARGET_NAME="${2}" ; shift 1 ;;
 		-s|--skip) TARGET_UPDATE="N" ;;
 		-i|--import) TARGET_IMPORT="Y" ;;
+		-p|--push) TARGET_PUSH="Y" ;;
 		-f|--force) FORCE="Y" ;;
+		-q|--quiet) QUIET="Y" ;;
 		-h|--help) fn_usage ;;
 	   	*) EXTRA_ARGS+=(${1}) ;;
 	esac
@@ -61,20 +69,17 @@ do
 done
 
 #set default
-if [ "${TARGET_DISTRO}" != "debian" -a "${TARGET_DISTRO}" != "ubuntu" -a "${TARGET_DISTRO}" != "alpine" ]; then
+if [ -z "${TARGET_DISTRO}" ]; then
 	TARGET_DISTRO=arch
 fi
-if [ "${TARGET_ARCH}" = "x86_64" ]; then
+if [ "${TARGET_DISTRO}" != "alpine" -a "${TARGET_DISTRO}" != "arch" -a "${TARGET_DISTRO}" != "debian" -a "${TARGET_DISTRO}" != "ubuntu" ]; then
+	fn_usage
+fi
+if [ -z "${TARGET_ARCH}" -o "${TARGET_ARCH}" = "x86_64" ]; then
 	TARGET_ARCH=x64
 fi
-if [ "${TARGET_ARCH}" = "i686" ]; then
-	TARGET_ARCH=x86
-fi
-if [ "${TARGET_ARCH}" = "arm" ]; then
-	TARGET_ARCH=armv5
-fi
-if [ "${TARGET_ARCH}" != "x64" -a "${TARGET_ARCH}" != "x86" -a "${TARGET_ARCH}" != "armv5" -a "${TARGET_ARCH}" != "armv6h" -a "${TARGET_ARCH}" != "armv7h" -a "${TARGET_ARCH}" != "aarch64" ]; then
-	TARGET_ARCH=x64
+if [ "${TARGET_ARCH}" != "x64" -a "${TARGET_ARCH}" != "armv7h" -a "${TARGET_ARCH}" != "aach64" ]; then
+	fn_usage
 fi
 if [ -z "${TARGET_OUTPUT}" ]; then
 	TARGET_OUTPUT=dist-${TARGET_DISTRO}-${TARGET_ARCH}
@@ -92,18 +97,42 @@ fi
 if [ "${TARGET_IMPORT}" != "Y" ]; then
 	TARGET_IMPORT="N"
 fi
+if [ "${TARGET_PUSH}" != "Y" ]; then
+	TARGET_PUSH="N"
+fi
+if [ "${TARGET_PUSH}" = "Y" ]; then
+	TARGET_IMPORT="Y"
+fi
+
+#qemu check
+if [ "${TARGET_ARCH}" = "armv7h" ]; then
+	if [ ! -e /proc/sys/fs/binfmt_misc/arm ]; then
+			echo "Cross compile needs binfmt"
+			exit 1
+	fi
+	TARGET_QEMU=qemu-arm-static
+elif [ "${TARGET_ARCH}" = "aarch64" ]; then
+	if [ ! -e /proc/sys/fs/binfmt_misc/aarch64 ]; then
+		echo "Cross compile needs binfmt"
+		exit 1
+	fi
+	TARGET_QEMU=qemu-aarch64-static
+fi
 
 #confirm
-echo "TARGET_DISTRO=${TARGET_DISTRO}"
-echo "TARGET_ARCH=${TARGET_ARCH}"
-echo "TARGET_OUTPUT=${TARGET_OUTPUT}"
-echo "TARGET_LOCALE=${TARGET_LOCALE}"
-echo "TARGET_NAME=${TARGET_NAME}"
-echo "TARGET_UPDATE=${TARGET_UPDATE}"
-echo "TARGET_IMPORT=${TARGET_IMPORT}"
-echo ""
-echo "FORCE=${FORCE}"
-echo ""
+if [ "${QUIET}" != "Y" ]; then
+	echo "TARGET_DISTRO=${TARGET_DISTRO}"
+	echo "TARGET_ARCH=${TARGET_ARCH}"
+	echo "TARGET_OUTPUT=${TARGET_OUTPUT}"
+	echo "TARGET_LOCALE=${TARGET_LOCALE}"
+	echo "TARGET_NAME=${TARGET_NAME}"
+	echo "TARGET_UPDATE=${TARGET_UPDATE}"
+	echo "TARGET_IMPORT=${TARGET_IMPORT}"
+	echo "TARGET_PUSH=${TARGET_PUSH}"
+	echo ""
+	echo "FORCE=${FORCE}"
+	echo ""
+fi
 if [ ! -e "${TARGET_OUTPUT}" ]; then
 	echo "Cannot found output(${TARGET_OUTPUT})"
 	exit 1
@@ -124,43 +153,54 @@ nameserver 8.8.8.8
 nameserver 8.8.4.4
 EOF
 
+#clear
+rm -rf ${TARGET_OUTPUT}/usr/local/bin/docker-*
+
 #qemu
-if [ -e "${TARGET_OUTPUT}/usr/bin/qemu-arm-static" ]; then
-	cp -f extra/qemu-arm-static "${TARGET_OUTPUT}/usr/bin/qemu-arm-static"
-elif [ -e "${TARGET_OUTPUT}/usr/bin/qemu-aarch64-static" ]; then
-	cp -f extra/qemu-aarch64-static "${TARGET_OUTPUT}/usr/bin/qemu-aarch64-static"
-fi
-if [ -e "${TARGET_OUTPUT}/usr/local/bin/docker-build-arm" ]; then
-	cp -f extra/docker-build-arm "${TARGET_OUTPUT}/usr/local/bin/docker-build-arm"
-	ln -sf docker-build-arm "${TARGET_OUTPUT}/usr/local/bin/docker-build-start"
-	ln -sf docker-build-arm "${TARGET_OUTPUT}/usr/local/bin/docker-build-end"
-elif [ -e "${TARGET_OUTPUT}/usr/local/bin/docker-build-aarch64" ]; then
-	cp -f extra/docker-build-aarch64 "${TARGET_OUTPUT}/usr/local/bin/docker-build-aarch64"
-	ln -sf docker-build-aarch64 "${TARGET_OUTPUT}/usr/local/bin/docker-build-start"
-	ln -sf docker-build-aarch64 "${TARGET_OUTPUT}/usr/local/bin/docker-build-end"
-else
-	cp -f extra/docker-build-start "${TARGET_OUTPUT}/usr/local/bin/docker-build-start"
-	cp -f extra/docker-build-end "${TARGET_OUTPUT}/usr/local/bin/docker-build-end"
+if [ ! -z "${TARGET_QEMU}" ]; then
+	cp -f extra/${TARGET_QEMU} "${TARGET_OUTPUT}/usr/bin/"
 fi
 
 #docker-install
 if [ -e "${TARGET_OUTPUT}/etc/arch-release" ]; then
 	cp -f extra/docker-install.arch ${TARGET_OUTPUT}/usr/local/bin/docker-install
-elif [ -e "${TARGET_OUTPUT}/etc/os-release" -a ! -z "$(grep "ID=debian" "${TARGET_OUTPUT}/etc/os-release")" ]; then
-	cp -f extra/docker-install.deb ${TARGET_OUTPUT}/usr/local/bin/docker-install
-elif [ -e "${TARGET_OUTPUT}/etc/os-release" -a ! -z "$(grep "ID=ubuntu" "${TARGET_OUTPUT}/etc/os-release")" ]; then
+	cp extra/docker-sysusers ${TARGET_OUTPUT}/usr/local/bin/
+	#cp extra/docker-tmpfiles ${TARGET_OUTPUT}/usr/local/bin/
+elif [ -e "${TARGET_OUTPUT}/etc/os-release" -a ! -z "$(grep "ID=\(debian\|ubuntu\)" "${TARGET_OUTPUT}/etc/os-release")" ]; then
 	cp -f extra/docker-install.deb ${TARGET_OUTPUT}/usr/local/bin/docker-install
 elif [ -e "${TARGET_OUTPUT}/etc/alpine-release" ]; then
 	cp -f extra/docker-install.alpine ${TARGET_OUTPUT}/usr/local/bin/docker-install
-	if [ -e "${TARGET_OUTPUT}/usr/bin/qemu-arm-static" ]; then
-		cp extra/docker-execve-check.alpine ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check
-		chown 0.0 ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check
-		chmod 755 ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check
-		cp extra/docker-execve-check.sh.alpine ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check.sh
-		chown 0.0 ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check.sh
-		chmod 755 ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check.sh
-	fi
 fi
+cp extra/docker-su ${TARGET_OUTPUT}/usr/local/bin/docker-su
+
+#docker-build
+if [ "${TARGET_ARCH}" = "armv7h" ]; then
+	cp -f extra/docker-build-arm "${TARGET_OUTPUT}/usr/local/bin/"
+	ln -sf docker-build-arm "${TARGET_OUTPUT}/usr/local/bin/docker-build-start"
+	ln -sf docker-build-arm "${TARGET_OUTPUT}/usr/local/bin/docker-build-end"
+	if [ -e ${TARGET_OUTPUT}/lib/ld-musl-armhf.so.1 ]; then
+		cp extra/docker-execve-check.armv7h.musl ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check
+	else
+		cp extra/docker-execve-check.armv7h.glibc ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check
+	fi
+	cp extra/docker-execve-check.sh ${TARGET_OUTPUT}/usr/local/bin/
+elif [ "${TARGET_ARCH}" = "aarch64" ]; then
+	cp -f extra/docker-build-aarch64 "${TARGET_OUTPUT}/usr/local/bin/"
+	ln -sf docker-build-aarch64 "${TARGET_OUTPUT}/usr/local/bin/docker-build-start"
+	ln -sf docker-build-aarch64 "${TARGET_OUTPUT}/usr/local/bin/docker-build-end"
+	if [ -e ${TARGET_OUTPUT}/lib/ld-musl-aarch64.so.1 ]; then
+		cp extra/docker-execve-check.aarch64.musl ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check
+	else
+		cp extra/docker-execve-check.aarch64.glibc ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check
+	fi
+	cp extra/docker-execve-check.sh ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check.sh
+else
+	cp -f extra/docker-build-x64 "${TARGET_OUTPUT}/usr/local/bin/docker-build"
+	ln -sf docker-build "${TARGET_OUTPUT}/usr/local/bin/docker-build-start"
+	ln -sf docker-build "${TARGET_OUTPUT}/usr/local/bin/docker-build-end"
+	cp extra/docker-execve-check.sh ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check
+fi
+
 
 #update
 prev_md5=
@@ -168,18 +208,14 @@ post_md5=
 if [ "${TARGET_UPDATE}" = "Y" ]; then
 	if [ -e "${TARGET_OUTPUT}/etc/arch-release" ]; then
 		prev_md5=$(tar -cf - ${TARGET_OUTPUT}/var/lib/pacman/local 2> /dev/null | md5sum | cut -f 1 -d ' ')
-	elif [ -e "${TARGET_OUTPUT}/etc/os-release" -a ! -z "$(grep "ID=debian" "${TARGET_OUTPUT}/etc/os-release")" ]; then
-		prev_md5=$(tar -cf - ${TARGET_OUTPUT}/var/lib/dpkg/info 2> /dev/null | md5sum | cut -f 1 -d ' ')
-	elif [ -e "${TARGET_OUTPUT}/etc/os-release" -a ! -z "$(grep "ID=ubuntu" "${TARGET_OUTPUT}/etc/os-release")" ]; then
+	elif [ -e "${TARGET_OUTPUT}/etc/os-release" -a ! -z "$(grep "ID=\(debian\|ubuntu\)" "${TARGET_OUTPUT}/etc/os-release")" ]; then
 		prev_md5=$(tar -cf - ${TARGET_OUTPUT}/var/lib/dpkg/info 2> /dev/null | md5sum | cut -f 1 -d ' ')
 	elif [ -e "${TARGET_OUTPUT}/etc/alpine-release" ]; then
 		prev_md5=$(md5sum ${TARGET_OUTPUT}/lib/apk/db/installed | cut -f 1 -d ' ')
 	fi
 	
-	if [ "${TARGET_ARCH}" = "armv7h" -o "${TARGET_ARCH}" = "armv6h" -o "${TARGET_ARH}" = "arm" ]; then
-		QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C arch-chroot "${TARGET_OUTPUT}" /usr/bin/qemu-arm-static -execve -0 /bin/sh /bin/sh -c "docker-install -r -u -c"
-	elif [ "${TARGET_ARCH}" = "aarch64" ]; then
-		QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C arch-chroot "${TARGET_OUTPUT}" /usr/bin/qemu-aarch64-static -execve -0 /bin/sh /bin/sh -c "docker-install -r -u -c"
+	if [ ! -z "${TARGET_QEMU}" ]; then
+		QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C arch-chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve -0 /bin/sh /bin/sh -c "docker-install -r -u -c"
 	else
 		PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C arch-chroot "${TARGET_OUTPUT}" /bin/sh -c "docker-install -r -u -c"
 	fi
@@ -256,3 +292,12 @@ if [ "${TARGET_IMPORT}" = "Y" ]; then
 	echo Success.
 	echo
 fi
+
+if [ "${TARGET_PUSH}" = "Y" ]; then
+	if [ ! -z "${SUDO_USER}" ]; then
+		su -s /bin/sh -c "docker push ${TARGET_NAME}:latest" - ${SUDO_USER}
+	else
+		docker push ${TARGET_NAME}:latest
+	fi
+fi
+
