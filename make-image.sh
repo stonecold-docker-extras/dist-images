@@ -5,8 +5,6 @@ if [ "${UID}" -ne 0 ]; then
 	exit $?
 fi
 
-set -x
-
 LANG="C"
 LC_ALL="C"
 
@@ -103,7 +101,7 @@ fn_make_arch() {
 	echo "Bootstrap"
 
 	local PACMAN_MIRRORLIST=
-	local PACMAN_BASE_PKGS=(bash bzip2 coreutils diffutils e2fsprogs filesystem findutils gettext glibc grep gzip less pacman perl procps-ng sed shadow systemd)
+	local PACMAN_BASE_PKGS=(bash bzip2 coreutils diffutils filesystem findutils gettext glibc grep gzip less pacman perl procps-ng sed shadow systemd)
 	local PACMAN_EXTRA_PKGS=()
 	local ARCH_KEYRING=
 
@@ -198,13 +196,13 @@ EOF
 	#skel
 	cp -ar ${TARGET_OUTPUT}/etc/skel/. ${TARGET_OUTPUT}/root/
 
-	#yaourt
-	if [ -e extra/package-query-*-${ARCH_ARCH}.pkg.tar.xz -a -e extra/yaourt-*-any.pkg.tar.xz ]; then
-		cp extra/package-query-*-${ARCH_ARCH}.pkg.tar.xz ${TARGET_OUTPUT}/
-		cp extra/yaourt-*-any.pkg.tar.xz ${TARGET_OUTPUT}/
-		arch-chroot ${TARGET_OUTPUT} /bin/sh -c "pacman -U --noconfirm --asdeps /package-query-*; pacman -U --noconfirm /yaourt-*-any.pkg.tar.xz"
-		rm -rf ${TARGET_OUTPUT}/*.pkg.tar.xz
-	fi
+	##yaourt
+	#if [ -e extra/package-query-*-${ARCH_ARCH}.pkg.tar.xz -a -e extra/yaourt-*-any.pkg.tar.xz ]; then
+	#	cp extra/package-query-*-${ARCH_ARCH}.pkg.tar.xz ${TARGET_OUTPUT}/
+	#	cp extra/yaourt-*-any.pkg.tar.xz ${TARGET_OUTPUT}/
+	#	arch-chroot ${TARGET_OUTPUT} /bin/sh -c "pacman -U --noconfirm --asdeps /package-query-*; pacman -U --noconfirm /yaourt-*-any.pkg.tar.xz"
+	#	rm -rf ${TARGET_OUTPUT}/*.pkg.tar.xz
+	#fi
 
 	echo
 
