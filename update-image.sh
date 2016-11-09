@@ -212,26 +212,26 @@ rm -rf ${TARGET_OUTPUT}/usr/local/bin/gosu
 #fi
 
 #su-exec
-rm -rf ${TARGET_OUTPUT}/usr/local/bin/su-exec
-#if [ "${TARGET_ARCH}" = "armv7h" ]; then
-#	if [ -e ${TARGET_OUTPUT}/lib/ld-musl-armhf.so.1 ]; then
-#		cp extra/su-exec-musl-armv7h ${TARGET_OUTPUT}/usr/local/bin/su-exec
-#	else
-#		cp extra/su-exec-glibc-armv7h ${TARGET_OUTPUT}/usr/local/bin/su-exec
-#	fi
-#elif [ "${TARGET_ARCH}" = "aarch64" ]; then
-#	if [ -e ${TARGET_OUTPUT}/lib/ld-musl-aarch64.so.1 ]; then
-#		cp extra/su-exec-musl-aarch64 ${TARGET_OUTPUT}/usr/local/bin/su-exec
-#	else
-#		cp extra/su-exec-glibc-aarch64 ${TARGET_OUTPUT}/usr/local/bin/su-exec
-#	fi
-#else
-#	if [ -e ${TARGET_OUTPUT}/lib/ld-musl-x86_64.so.1 ]; then
-#		cp extra/su-exec-musl-x64 ${TARGET_OUTPUT}/usr/local/bin/su-exec
-#	else
-#		cp extra/su-exec-glibc-x64 ${TARGET_OUTPUT}/usr/local/bin/su-exec
-#	fi
-#fi
+#rm -rf ${TARGET_OUTPUT}/usr/local/bin/su-exec
+if [ "${TARGET_ARCH}" = "armv7h" ]; then
+	if [ -e ${TARGET_OUTPUT}/lib/ld-musl-armhf.so.1 ]; then
+		cp extra/su-exec-musl-armv7h ${TARGET_OUTPUT}/usr/local/bin/su-exec
+	else
+		cp extra/su-exec-glibc-armv7h ${TARGET_OUTPUT}/usr/local/bin/su-exec
+	fi
+elif [ "${TARGET_ARCH}" = "aarch64" ]; then
+	if [ -e ${TARGET_OUTPUT}/lib/ld-musl-aarch64.so.1 ]; then
+		cp extra/su-exec-musl-aarch64 ${TARGET_OUTPUT}/usr/local/bin/su-exec
+	else
+		cp extra/su-exec-glibc-aarch64 ${TARGET_OUTPUT}/usr/local/bin/su-exec
+	fi
+else
+	if [ -e ${TARGET_OUTPUT}/lib/ld-musl-x86_64.so.1 ]; then
+		cp extra/su-exec-musl-x64 ${TARGET_OUTPUT}/usr/local/bin/su-exec
+	else
+		cp extra/su-exec-glibc-x64 ${TARGET_OUTPUT}/usr/local/bin/su-exec
+	fi
+fi
 
 
 #update
