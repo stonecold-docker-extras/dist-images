@@ -256,8 +256,8 @@ fn_make_debian_common() {
 		exit 1
 	fi
 
-	alias apt-get="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin LANG=C LC_ALL=C DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true /usr/bin/apt-get -o Acquire::Languages=none -o Acquire::GzipIndexes=true -o Acquire::CompressionTypes::Order::=gz -o APT::Install-Recommends=0 -o APT::Install-Suggests=0 -o APT::Get::Assume-Yes=true -o APT::Get::allow-downgrades=true -o APT::Get::allow-remove-essential=true -o APT::Get::allow-change-held-packages=true"
-	alias debootstrap="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin LANG=C LC_ALL=C DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true /usr/bin/debootstrap -o Acquire::Languages=none -o Acquire::GzipIndexes=true -o Acquire::CompressionTypes::Order::=gz -o APT::Install-Recommends=0 -o APT::Install-Suggests=0 -o APT::Get::Assume-Yes=true -o APT::Get::allow-downgrades=true -o APT::Get::allow-remove-essential=true -o APT::Get::allow-change-held-packages=true"
+	alias apt-get="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin LANG=C LC_ALL=C DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true /usr/bin/apt-get -o Acquire::Languages=none -o Acquire::GzipIndexes=true -o Acquire::CompressionTypes::Order::=gz -o APT::Install-Recommends=false -o APT::Install-Suggests=false" 
+	alias debootstrap="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin LANG=C LC_ALL=C DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true /usr/bin/debootstrap -o Acquire::Languages=none -o Acquire::GzipIndexes=true -o Acquire::CompressionTypes::Order::=gz -o APT::Install-Recommends=false -o APT::Install-Suggests=false"
 
 	local DEBIAN_DIST="${1}"
 	local DEBIAN_MIRROR="${2}"
@@ -349,7 +349,45 @@ EOF
 	fi
 
 	#PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LC_ALL=C DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true chroot "${TARGET_OUTPUT}" /bin/sh -c "apt-get -o Acquire::Languages=none -o Acquire::GzipIndexes=true -o Acquire::CompressionTypes::Order::=gz -o APT::Install-Recommends=0 -o APT::Install-Suggests=0 -o APT::Get::Assume-Yes=true -o APT::Get::allow-downgrades=true -o APT::Get::allow-remove-essential=true -o APT::Get::allow-change-held-packages=true update ; apt-get -o Acquire::Languages=none -o Acquire::GzipIndexes=true -o Acquire::CompressionTypes::Order::=gz -o APT::Install-Recommends=0 -o APT::Install-Suggests=0 -o APT::Get::Assume-Yes=true -o APT::Get::allow-downgrades=true -o APT::Get::allow-remove-essential=true -o APT::Get::allow-change-held-packages=true dist-upgrade -y ; apt-get -o Acquire::Languages=none -o Acquire::GzipIndexes=true -o Acquire::CompressionTypes::Order::=gz -o APT::Install-Recommends=0 -o APT::Install-Suggests=0 -o APT::Get::Assume-Yes=true -o APT::Get::allow-downgrades=true -o APT::Get::allow-remove-essential=true -o APT::Get::allow-change-held-packages=true install apt-utils -y ; apt-get autoremove --purge -y ; apt-get autoclean -y ; apt-get clean ; find /var/lib/apt -type f -exec rm \"{}\" \\;"
+	if strings "${TARGET_OUTPUT}/usr/bin/dpkg" | grep -q unsafe-io; then
+		# force dpkg not to call sync() after package extraction (speeding up installs)
+		cat > "${TARGET_OUTPUT}/etc/dpkg/dpkg.cfg.d/docker-apt-speedup" <<-'EOF'
+		force-unsafe-io
+		EOF
+	fi
 	
+	if [ -d "${TARGET_OUTPUT}/etc/apt/apt.conf.d" ]; then
+		# _keep_ us lean by effectively running "apt-get clean" after every install
+		aptGetClean='"rm -f /var/cache/apt/archives/*.deb /var/cache/apt/archives/partial/*.deb /var/cache/apt/*.bin || true";'
+		cat > "${TARGET_OUTPUT}/etc/apt/apt.conf.d/docker-clean" <<-EOF
+		DPkg::Post-Invoke { ${aptGetClean} };
+		APT::Update::Post-Invoke { ${aptGetClean} };
+
+		Dir::Cache::pkgcache "";
+		Dir::Cache::srcpkgcache "";
+		EOF
+
+		cat > "${TARGET_OUTPUT}/etc/apt/apt.conf.d/docker-no-languages" <<-'EOF'
+		Acquire::Languages "none";
+		EOF
+
+		cat > "${TARGET_OUTPUT}/etc/apt/apt.conf.d/docker-gzip-indexes" <<-'EOF'
+		Acquire::GzipIndexes "true";
+		Acquire::CompressionTypes::Order:: "gz";
+		EOF
+
+		cat > "${TARGET_OUTPUT}/etc/apt/apt.conf.d/docker-gzip-indexes" <<-'EOF'
+		Acquire::GzipIndexes "true";
+		Acquire::CompressionTypes::Order:: "gz";
+		EOF
+
+
+		cat > "${TARGET_OUTPUT}/etc/apt/apt.conf.d/docker-recommends-suggests" <<-'EOF'
+		APT::Install-Recommends "false";
+		APT::Install-Suggests "false";
+		EOF
+	fi
+
 	fn_common
 }
 

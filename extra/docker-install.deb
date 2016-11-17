@@ -3,7 +3,7 @@
 LC_ALL=C 
 
 apt-get() {
-DEBIAN_FRONTEND=noninteractive /usr/bin/apt-get $(grep '^deb [^ ]* [^ ]*-[^ ]* .*$' /etc/apt/sources.list | sed 's/^deb [^ ]* \([^ ]*-[^ ]*\) .*$/-t \1/g') -o Acquire::Languages=none -o Acquire::GzipIndexes=true -o Acquire::CompressionTypes::Order::=gz -o APT::Install-Recommends=0 -o APT::Install-Suggests=0 -o APT::Get::Assume-Yes=true -o APT::Get::allow-downgrades=true -o APT::Get::allow-remove-essential=true -o APT::Get::allow-change-held-packages=true ${@}
+	DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true /usr/bin/apt-get -y $(grep '^deb [^ ]* [^ ]*-[^ ]* .*$' /etc/apt/sources.list | sed 's/^deb [^ ]* \([^ ]*-[^ ]*\) .*$/-t \1/g') "${@}"
 }
 
 fn_usage() {
