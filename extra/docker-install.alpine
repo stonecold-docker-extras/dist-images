@@ -11,6 +11,10 @@ fn_refresh() {
 
 fn_update() {
 	apk upgrade $@
+
+	if [ -e /etc/TZ.apk-new ]; then
+		mv /etc/TZ.apk-new /etc/TZ
+	fi
 }
 
 fn_install() {
