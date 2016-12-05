@@ -522,7 +522,7 @@ if [ "${TARGET_REMOVE}" != "Y" ]; then
 fi
 if [ "${TARGET_TYPE}" = "docker" ]; then
 	if [ -z "${TARGET_NAME}" ]; then
-		TARGET_NAME=forumi0721/${TARGET_DISTRO}-${TARGET_ARCH}-base
+		TARGET_NAME=forumi0721${TARGET_DISTRO}${TARGET_ARCH}/${TARGET_DISTRO}-${TARGET_ARCH}-base
 	fi
 else
 	TARGET_NAME=

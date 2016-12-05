@@ -89,7 +89,7 @@ if [ -z "${TARGET_LOCALE}" ]; then
 	TARGET_LOCALE=ko_KR.UTF-8
 fi
 if [ -z "${TARGET_NAME}" ]; then
-	TARGET_NAME=forumi0721/${TARGET_DISTRO}-${TARGET_ARCH}-base
+	TARGET_NAME=forumi0721${TARGET_DISTRO}${TARGET_ARCH}/${TARGET_DISTRO}-${TARGET_ARCH}-base
 fi
 if [ "${TARGET_UPDATE}" != "N" ]; then
 	TARGET_UPDATE="Y"
