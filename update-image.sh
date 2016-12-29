@@ -78,7 +78,7 @@ fi
 if [ -z "${TARGET_ARCH}" -o "${TARGET_ARCH}" = "x86_64" ]; then
 	TARGET_ARCH=x64
 fi
-if [ "${TARGET_ARCH}" != "x64" -a "${TARGET_ARCH}" != "armv7h" -a "${TARGET_ARCH}" != "aach64" ]; then
+if [ "${TARGET_ARCH}" != "x64" -a "${TARGET_ARCH}" != "armv7h" -a "${TARGET_ARCH}" != "aarch64" ]; then
 	fn_usage
 fi
 if [ -z "${TARGET_OUTPUT}" ]; then
