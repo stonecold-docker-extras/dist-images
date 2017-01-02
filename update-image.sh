@@ -16,7 +16,7 @@ fi
 fn_usage() {
 	echo "Usage : $(basename "${0}") [-d distro] [-a architecture] [-o output] [-l locale] [-z timezone] [-s] [-i] [-p] [-q]"
 	echo "          [-d distro] : arch,alpine,debian,ubuntu (default : arch)"
-	echo "          [-a architecture] : x64(x86_64),armv7h,aarch64 (default : x64)"
+	echo "          [-a architecture] : x64(x86_64),armv7h(armhf),aarch64(arm64) (default : x64)"
 	echo "          [-o output] : output dir (default : distro_archtecture)"
 	echo "          [-l locale] : locale (default : ko_KR.UTF-8)"
 	echo "          [-z timezone] : timezone (default : Asia/Seoul)"
@@ -78,7 +78,13 @@ fi
 if [ -z "${TARGET_ARCH}" -o "${TARGET_ARCH}" = "x86_64" ]; then
 	TARGET_ARCH=x64
 fi
-if [ "${TARGET_ARCH}" != "x64" -a "${TARGET_ARCH}" != "armv7h" -a "${TARGET_ARCH}" != "aarch64" ]; then
+if [ "${TARGET_ARCH}" = "armv7h" ]; then
+	TARGET_ARCH=armhf
+fi
+if [ "${TARGET_ARCH}" = "arm64" ]; then
+	TARGET_ARCH=aarch64
+fi
+if [ "${TARGET_ARCH}" != "x64" -a "${TARGET_ARCH}" != "armhf" -a "${TARGET_ARCH}" != "aarch64" ]; then
 	fn_usage
 fi
 if [ -z "${TARGET_OUTPUT}" ]; then
@@ -89,7 +95,7 @@ if [ -z "${TARGET_LOCALE}" ]; then
 	TARGET_LOCALE=ko_KR.UTF-8
 fi
 if [ -z "${TARGET_NAME}" ]; then
-	TARGET_NAME=forumi0721${TARGET_DISTRO}${TARGET_ARCH}/${TARGET_DISTRO}-${TARGET_ARCH}-base
+	TARGET_NAME=forumi0721/${TARGET_DISTRO}-${TARGET_ARCH}-base
 fi
 if [ "${TARGET_UPDATE}" != "N" ]; then
 	TARGET_UPDATE="Y"
@@ -105,7 +111,7 @@ if [ "${TARGET_PUSH}" = "Y" ]; then
 fi
 
 #qemu check
-if [ "${TARGET_ARCH}" = "armv7h" ]; then
+if [ "${TARGET_ARCH}" = "armhf" ]; then
 	if [ ! -e /proc/sys/fs/binfmt_misc/arm ]; then
 			echo "Cross compile needs binfmt"
 			exit 1
@@ -174,7 +180,7 @@ fi
 cp extra/docker-su ${TARGET_OUTPUT}/usr/local/bin/docker-su
 
 #docker-build
-if [ "${TARGET_ARCH}" = "armv7h" ]; then
+if [ "${TARGET_ARCH}" = "armhf" ]; then
 	cp -f extra/docker-build-arm "${TARGET_OUTPUT}/usr/local/bin/"
 	ln -sf docker-build-arm "${TARGET_OUTPUT}/usr/local/bin/docker-build-start"
 	ln -sf docker-build-arm "${TARGET_OUTPUT}/usr/local/bin/docker-build-end"
@@ -203,7 +209,7 @@ fi
 
 #gosu
 rm -rf ${TARGET_OUTPUT}/usr/local/bin/gosu
-#if [ "${TARGET_ARCH}" = "armv7h" ]; then
+#if [ "${TARGET_ARCH}" = "armhf" ]; then
 #	cp extra/gosu-armhf ${TARGET_OUTPUT}/usr/local/bin/gosu
 #elif [ "${TARGET_ARCH}" = "aarch64" ]; then
 #	cp extra/gosu-arm64 ${TARGET_OUTPUT}/usr/local/bin/gosu
@@ -213,7 +219,7 @@ rm -rf ${TARGET_OUTPUT}/usr/local/bin/gosu
 
 #su-exec
 #rm -rf ${TARGET_OUTPUT}/usr/local/bin/su-exec
-if [ "${TARGET_ARCH}" = "armv7h" ]; then
+if [ "${TARGET_ARCH}" = "armhf" ]; then
 	if [ -e ${TARGET_OUTPUT}/lib/ld-musl-armhf.so.1 ]; then
 		cp extra/su-exec-musl-armv7h ${TARGET_OUTPUT}/usr/local/bin/su-exec
 	else

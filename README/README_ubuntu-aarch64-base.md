@@ -1,13 +1,13 @@
-# [ubuntu-armv7h-base](https://hub.docker.com/r/forumi0721ubuntuarmv7h/ubuntu-armv7h-base/)
-[![](https://images.microbadger.com/badges/version/forumi0721ubuntuarmv7h/ubuntu-armv7h-base.svg)](https://microbadger.com/images/forumi0721ubuntuarmv7h/ubuntu-armv7h-base "Get your own version badge on microbadger.com") [![](https://images.microbadger.com/badges/image/forumi0721ubuntuarmv7h/ubuntu-armv7h-base.svg)](https://microbadger.com/images/forumi0721ubuntuarmv7h/ubuntu-armv7h-base "Get your own image badge on microbadger.com") [![Docker Stars](https://img.shields.io/docker/stars/forumi0721ubuntuarmv7h/ubuntu-armv7h-base.svg?style=flat-square)](https://hub.docker.com/r/forumi0721ubuntuarmv7h/ubuntu-armv7h-base/) [![Docker Pulls](https://img.shields.io/docker/pulls/forumi0721ubuntuarmv7h/ubuntu-armv7h-base.svg?style=flat-square)](https://hub.docker.com/r/forumi0721ubuntuarmv7h/ubuntu-armv7h-base/)
+# [ubuntu-aarch64-base](https://hub.docker.com/r/forumi0721/ubuntu-aarch64-base/)
+[![](https://images.microbadger.com/badges/version/forumi0721/ubuntu-aarch64-base.svg)](https://microbadger.com/images/forumi0721/ubuntu-aarch64-base "Get your own version badge on microbadger.com") [![](https://images.microbadger.com/badges/image/forumi0721/ubuntu-aarch64-base.svg)](https://microbadger.com/images/forumi0721/ubuntu-aarch64-base "Get your own image badge on microbadger.com") [![Docker Stars](https://img.shields.io/docker/stars/forumi0721/ubuntu-aarch64-base.svg?style=flat-square)](https://hub.docker.com/r/forumi0721/ubuntu-aarch64-base/) [![Docker Pulls](https://img.shields.io/docker/pulls/forumi0721/ubuntu-aarch64-base.svg?style=flat-square)](https://hub.docker.com/r/forumi0721/ubuntu-aarch64-base/)
 
 
 
 ----------------------------------------
 #### Description
 * Distribution : [Ubuntu](https://www.ubuntu.com/)
-* Architecture : armv7h
-* Base Image   : [forumi0721ubuntuarmv7h/ubuntu-armv7h-base](https://hub.docker.com/r/forumi0721ubuntuarmv7h/ubuntu-armv7h-base/)
+* Architecture : aarch64
+* Base Image   : [forumi0721/ubuntu-aarch64-base](https://hub.docker.com/r/forumi0721/ubuntu-aarch64-base/)
 * Appplication : -
 
 
@@ -16,7 +16,7 @@
 #### Run
 ```sh
 docker run -i -t --rm \
-           forumi0721ubuntuarmv7h/ubuntu-armv7h-base:latest
+           forumi0721/ubuntu-aarch64-base:latest
 ```
 
 
@@ -24,7 +24,7 @@ docker run -i -t --rm \
 ----------------------------------------
 #### Usage
 ```dockerfile
-FROM forumi0721ubuntuarmv7h/ubuntu-armv7h-base:latest
+FROM forumi0721/ubuntu-aarch64-base:latest
 
 #For cross compile on dockerhub
 RUN ["docker-build-start"]
@@ -72,6 +72,7 @@ RUN ["docker-build-end"]
 
 
 ----------------------------------------
-* [forumi0721ubuntux64/ubuntu-x64-base](https://hub.docker.com/r/forumi0721ubuntux64/ubuntu-x64-base/)
-* [forumi0721ubuntuarmv7h/ubuntu-armv7h-base](https://hub.docker.com/r/forumi0721ubuntuarmv7h/ubuntu-armv7h-base/)
+* [forumi0721/ubuntu-x64-base](https://hub.docker.com/r/forumi0721/ubuntu-x64-base/)
+* [forumi0721/ubuntu-armhf-base](https://hub.docker.com/r/forumi0721/ubuntu-armhf-base/)
+* [forumi0721/ubuntu-aarch64-base](https://hub.docker.com/r/forumi0721/ubuntu-aarch64-base/)
 

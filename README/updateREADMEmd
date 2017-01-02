@@ -2,7 +2,7 @@
 
 set -e
 
-if [ -z "$(which node 2> /dev/null)" -o -z "$(which api 2> /dev/null)" -o ! -e /opt/node_modules/docker-hub-api/play.js ]; then
+if [ -z "$(which docker-hub-api 2> /dev/null)" ]; then
 	echo "Cannot found docker-hub-api"
 	exit 1
 fi
@@ -12,7 +12,7 @@ do
 	name=${md/README_/}
 	name=${name/.md/}
 	echo ${name}
-	api setRepositoryDescriptionFullFromFile forumi0721 ${name} ${md}
+	docker-hub-api setRepositoryDescriptionFullFromFile forumi0721 ${name} ${md}
 	echo
 done
 

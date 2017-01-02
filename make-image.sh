@@ -23,7 +23,7 @@ echo_blue() {
 fn_usage() {
 	echo "Usage : $(basename "${0}") [-d distro] [-a architecture] [-o output] [-t type] [-l locale] [-z timezone] [-c] [-r] [-i include packages] [-e exclude pacakges]"
 	echo "          [-d distro] : arch,alpine,debian,ubuntu (default : arch)"
-	echo "          [-a architecture] : x64(x86_64),armv7h,aarch64 (default : x64)"
+	echo "          [-a architecture] : x64(x86_64),armv7h(armhf),aarch64(arm64) (default : x64)"
 	echo "          [-o output] : output dir (default : distro_archtecture)"
 	echo "          [-t type] : docker,native (default : docker)"
 	echo "          [-l locale] : locale (default : ko_KR.UTF-8)"
@@ -107,12 +107,14 @@ fn_make_arch() {
 
 	local ARCH_ARCH=${TARGET_ARCH}
 	ARCH_ARCH=${ARCH_ARCH/x64/x86_64}
+	ARCH_ARCH=${ARCH_ARCH/armhf/armv7h}
+	ARCH_ARCH=${ARCH_ARCH/aarch64/aarch64}
 
 	if [ -z "$(ls /var/cache/pacman/pkg | grep "${ARCH_ARCH}.pkg.tar.xz")" ]; then
 		rm -rf /var/cache/pacman/pkg/*
 	fi
 
-	if [ "${TARGET_ARCH}" = "armv7h" -o "${TARGET_ARCH}" = "aarch64" ]; then
+	if [ "${ARCH_ARCH}" = "armv7h" -o "${ARCH_ARCH}" = "aarch64" ]; then
 		#PACMAN_MIRRORLIST='Server = http://mirror.archlinuxarm.org/$arch/$repo'
 		PACMAN_MIRRORLIST='Server = http://ca.us.mirror.archlinuxarm.org/$arch/$repo'
 		PACMAN_EXTRA_PKGS=('archlinuxarm-keyring' 'haveged')
@@ -138,13 +140,13 @@ ${PACMAN_MIRRORLIST}
 [community]
 ${PACMAN_MIRRORLIST}
 EOF
-	if [ "${TARGET_ARCH}" = "x64" ]; then
+	if [ "${ARCH_ARCH}" = "x86_64" ]; then
 	cat << EOF >> "${PACMAN_CONF}"
 [multilib]
 ${PACMAN_MIRRORLIST}
 EOF
 	fi
-	if [ "${TARGET_ARCH}" = "armv7h" -o "${TARGET_ARCH}" = "aarch64" ]; then
+	if [ "${ARCH_ARCH}" = "armv7h" -o "${ARCH_ARCH}" = "aarch64" ]; then
 		cat << EOF >> "${PACMAN_CONF}"
 [alarm]
 ${PACMAN_MIRRORLIST}
@@ -235,17 +237,18 @@ fn_make_debian() {
 fn_make_ubuntu() {
 	local DEBIAN_DIST=xenial
 	local DEBIAN_MIRROR=
-	if [ "${TARGET_ARCH}" = "armv7h" -o "${TARGET_ARCH}" = "aarch64" ]; then
-		DEBIAN_MIRROR=http://ports.ubuntu.com/ubuntu-ports
-	else
-		DEBIAN_MIRROR=http://kr.archive.ubuntu.com/ubuntu
-	fi
 	local DEBIAN_EXTRA=
 
 	local DEBIAN_ARCH=${TARGET_ARCH}
 	DEBIAN_ARCH=${DEBIAN_ARCH/x64/amd64}
 	DEBIAN_ARCH=${DEBIAN_ARCH/armv7h/armhf}
 	DEBIAN_ARCH=${DEBIAN_ARCH/aarch64/arm64}
+
+	if [ "${DEBIAN_ARCH}" = "armhf" -o "${DEBIAN_ARCH}" = "arm64" ]; then
+		DEBIAN_MIRROR=http://ports.ubuntu.com/ubuntu-ports
+	else
+		DEBIAN_MIRROR=http://kr.archive.ubuntu.com/ubuntu
+	fi
 
 	fn_make_debian_common "${DEBIAN_DIST}" "${DEBIAN_MIRROR}" "${DEBIAN_EXTRA}" "${DEBIAN_ARCH}"
 }
@@ -495,7 +498,13 @@ fi
 if [ -z "${TARGET_ARCH}" -o "${TARGET_ARCH}" = "x86_64" ]; then
 	TARGET_ARCH=x64
 fi
-if [ "${TARGET_ARCH}" != "x64" -a "${TARGET_ARCH}" != "armv7h" -a "${TARGET_ARCH}" != "aarch64" ]; then
+if [ "${TARGET_ARCH}" = "armv7h" ]; then
+	TARGET_ARCH=armhf
+fi
+if [ "${TARGET_ARCH}" = "arm64" ]; then
+	TARGET_ARCH=aarch64
+fi
+if [ "${TARGET_ARCH}" != "x64" -a "${TARGET_ARCH}" != "armhf" -a "${TARGET_ARCH}" != "aarch64" ]; then
 	fn_usage
 fi
 if [ -z "${TARGET_OUTPUT}" ]; then
@@ -522,14 +531,14 @@ if [ "${TARGET_REMOVE}" != "Y" ]; then
 fi
 if [ "${TARGET_TYPE}" = "docker" ]; then
 	if [ -z "${TARGET_NAME}" ]; then
-		TARGET_NAME=forumi0721${TARGET_DISTRO}${TARGET_ARCH}/${TARGET_DISTRO}-${TARGET_ARCH}-base
+		TARGET_NAME=forumi0721/${TARGET_DISTRO}-${TARGET_ARCH}-base
 	fi
 else
 	TARGET_NAME=
 fi
 
 #qemu check
-if [ "${TARGET_ARCH}" = "armv7h" ]; then
+if [ "${TARGET_ARCH}" = "armhf" -o "${TARGET_ARCH}" = "armel" ]; then
 	if [ ! -e /proc/sys/fs/binfmt_misc/arm ]; then
 			echo "Cross compile needs binfmt"
 			exit 1

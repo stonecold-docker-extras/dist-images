@@ -8,7 +8,7 @@ import (
 )
 
 func crossBuildStart() {
-	err := os.Remove("/bin/sh")
+	err := os.Rename("/bin/sh", "/bin/sh.real")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -23,7 +23,7 @@ func crossBuildEnd() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	err = os.Link("/bin/sh.real", "/bin/sh")
+	err = os.Rename("/bin/sh.real", "/bin/sh")
 	if err != nil {
 		log.Fatal(err)
 	}
