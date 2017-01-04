@@ -30,6 +30,10 @@ fn_install() {
 			fi
 		fi
 	fi
+
+	if [ "${execve_error}" = "Y" ]; then
+		echo "execve error!"
+	fi
 	
 	if [ "${execve_error}" = "Y" ]; then
 		busybox_trigger=$(tar tf /lib/apk/db/scripts.tar | busybox grep 'busybox-.*\.trigger' | sed 's/busybox-[^-]*-[^\.]*\.\(.*\)\.trigger/\1/g')
@@ -83,6 +87,10 @@ fn_del() {
 				execve_error=Y
 			fi
 		fi
+	fi
+
+	if [ "${execve_error}" = "Y" ]; then
+		echo "execve error!"
 	fi
 	
 	if [ "${execve_error}" = "Y" ]; then
