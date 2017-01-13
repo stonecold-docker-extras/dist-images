@@ -314,41 +314,61 @@ EOF
 	#Mirror
 	if [ "${TARGET_DISTRO}" = "debian" ]; then
 		#echo "deb http://security.debian.org/ ${DEBIAN_DIST}/updates main" >> ${TARGET_OUTPUT}/etc/apt/sources.list
-		cat << EOF > ${TARGET_OUTPUT}/etc/apt/sources.list
-deb ${DEBIAN_MIRROR} ${DEBIAN_DIST} main contrib non-free
-# deb-src ${DEBIAN_MIRROR} ${DEBIAN_DIST} main contrib non-free
+		#cat <<- EOF > ${TARGET_OUTPUT}/etc/apt/sources.list
+		#deb ${DEBIAN_MIRROR} ${DEBIAN_DIST} main contrib non-free
+		## deb-src ${DEBIAN_MIRROR} ${DEBIAN_DIST} main contrib non-free
 
-deb ${DEBIAN_MIRROR} ${DEBIAN_DIST}-updates main contrib non-free
-# deb-src ${DEBIAN_MIRROR} ${DEBIAN_DIST}-updates main contrib non-free
+		#deb ${DEBIAN_MIRROR} ${DEBIAN_DIST}-updates main contrib non-free
+		## deb-src ${DEBIAN_MIRROR} ${DEBIAN_DIST}-updates main contrib non-free
 
-deb ${DEBIAN_MIRROR} ${DEBIAN_DIST}-proposed-updates main contrib non-free
-# deb-src ${DEBIAN_MIRROR} ${DEBIAN_DIST}-proposed-updates main contrib non-free
+		##deb ${DEBIAN_MIRROR} ${DEBIAN_DIST}-proposed-updates main contrib non-free
+		### deb-src ${DEBIAN_MIRROR} ${DEBIAN_DIST}-proposed-updates main contrib non-free
 
-deb ${DEBIAN_MIRROR} ${DEBIAN_DIST}-backports main contrib non-free
-# deb-src ${DEBIAN_MIRROR} ${DEBIAN_DIST}-backports main contrib non-free
+		##deb ${DEBIAN_MIRROR} ${DEBIAN_DIST}-backports main contrib non-free
+		### deb-src ${DEBIAN_MIRROR} ${DEBIAN_DIST}-backports main contrib non-free
 
-deb http://security.debian.org ${DEBIAN_DIST}/updates main contrib non-free
-# deb-src http://security.debian.org ${DEBIAN_DIST}/updates main contrib non-free
-EOF
+		#deb http://security.debian.org ${DEBIAN_DIST}/updates main contrib non-free
+		## deb-src http://security.debian.org ${DEBIAN_DIST}/updates main contrib non-free
+		#EOF
+		cat <<- EOF > ${TARGET_OUTPUT}/etc/apt/sources.list
+		deb ${DEBIAN_MIRROR} ${DEBIAN_DIST} main
+		# deb-src ${DEBIAN_MIRROR} ${DEBIAN_DIST} main
+
+		deb ${DEBIAN_MIRROR} ${DEBIAN_DIST}-updates main
+		# deb-src ${DEBIAN_MIRROR} ${DEBIAN_DIST}-updates main
+
+		deb http://security.debian.org ${DEBIAN_DIST}/updates main
+		# deb-src http://security.debian.org ${DEBIAN_DIST}/updates main
+		EOF
 	fi
 	if [ "${TARGET_DISTRO}" = "ubuntu" ]; then
 		#sed -i "s/ ${DEBIAN_DIST} main$/ ${DEBIAN_DIST} main universe/; p; s/ ${DEBIAN_DIST} main/ ${DEBIAN_DIST}-updates main/; p; s/ ${DEBIAN_DIST}-updates main/ ${DEBIAN_DIST}-security main/" ${TARGET_OUTPUT}/etc/apt/sources.list
-		cat << EOF > ${TARGET_OUTPUT}/etc/apt/sources.list
-deb ${DEBIAN_MIRROR} ${DEBIAN_DIST} main universe restricted multiverse
-# deb-src ${DEBIAN_MIRROR} ${DEBIAN_DIST} main universe restricted multiverse
+		#cat <<- EOF > ${TARGET_OUTPUT}/etc/apt/sources.list
+		#deb ${DEBIAN_MIRROR} ${DEBIAN_DIST} main universe restricted multiverse
+		## deb-src ${DEBIAN_MIRROR} ${DEBIAN_DIST} main universe restricted multiverse
+		#
+		#deb ${DEBIAN_MIRROR} ${DEBIAN_DIST}-updates main universe restricted multiverse
+		## deb-src ${DEBIAN_MIRROR} ${DEBIAN_DIST}-updates main universe restricted multiverse
+		#
+		##deb ${DEBIAN_MIRROR} ${DEBIAN_DIST}-proposed main universe restricted multiverse
+		### deb-src ${DEBIAN_MIRROR} ${DEBIAN_DIST}-proposed main universe restricted multiverse
+		#
+		##deb ${DEBIAN_MIRROR} ${DEBIAN_DIST}-backports main universe restricted multiverse
+		### deb-src ${DEBIAN_MIRROR} ${DEBIAN_DIST}-backports main universe restricted multiverse
+		#
+		#deb ${DEBIAN_MIRROR} ${DEBIAN_DIST}-security main universe restricted multiverse
+		## deb-src ${DEBIAN_MIRROR} ${DEBIAN_DIST}-security main universe restricted multiverse
+		#EOF
+		cat <<- EOF > ${TARGET_OUTPUT}/etc/apt/sources.list
+		deb ${DEBIAN_MIRROR} ${DEBIAN_DIST} main restricted universe
+		# deb-src ${DEBIAN_MIRROR} ${DEBIAN_DIST} main restricted universe
 
-deb ${DEBIAN_MIRROR} ${DEBIAN_DIST}-updates main universe restricted multiverse
-# deb-src ${DEBIAN_MIRROR} ${DEBIAN_DIST}-updates main universe restricted multiverse
+		deb ${DEBIAN_MIRROR} ${DEBIAN_DIST}-updates main restricted universe
+		# deb-src ${DEBIAN_MIRROR} ${DEBIAN_DIST}-updates main restricted universe
 
-deb ${DEBIAN_MIRROR} ${DEBIAN_DIST}-proposed main universe restricted multiverse
-# deb-src ${DEBIAN_MIRROR} ${DEBIAN_DIST}-proposed main universe restricted multiverse
-
-deb ${DEBIAN_MIRROR} ${DEBIAN_DIST}-backports main universe restricted multiverse
-# deb-src ${DEBIAN_MIRROR} ${DEBIAN_DIST}-backports main universe restricted multiverse
-
-deb ${DEBIAN_MIRROR} ${DEBIAN_DIST}-security main universe restricted multiverse
-# deb-src ${DEBIAN_MIRROR} ${DEBIAN_DIST}-security main universe restricted multiverse
-EOF
+		deb ${DEBIAN_MIRROR} ${DEBIAN_DIST}-security main restricted universe
+		# deb-src ${DEBIAN_MIRROR} ${DEBIAN_DIST}-security main restricted universe
+		EOF
 	fi
 
 	#PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LC_ALL=C DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true chroot "${TARGET_OUTPUT}" /bin/sh -c "apt-get -o Acquire::Languages=none -o Acquire::GzipIndexes=true -o Acquire::CompressionTypes::Order::=gz -o APT::Install-Recommends=0 -o APT::Install-Suggests=0 -o APT::Get::Assume-Yes=true -o APT::Get::allow-downgrades=true -o APT::Get::allow-remove-essential=true -o APT::Get::allow-change-held-packages=true update ; apt-get -o Acquire::Languages=none -o Acquire::GzipIndexes=true -o Acquire::CompressionTypes::Order::=gz -o APT::Install-Recommends=0 -o APT::Install-Suggests=0 -o APT::Get::Assume-Yes=true -o APT::Get::allow-downgrades=true -o APT::Get::allow-remove-essential=true -o APT::Get::allow-change-held-packages=true dist-upgrade -y ; apt-get -o Acquire::Languages=none -o Acquire::GzipIndexes=true -o Acquire::CompressionTypes::Order::=gz -o APT::Install-Recommends=0 -o APT::Install-Suggests=0 -o APT::Get::Assume-Yes=true -o APT::Get::allow-downgrades=true -o APT::Get::allow-remove-essential=true -o APT::Get::allow-change-held-packages=true install apt-utils -y ; apt-get autoremove --purge -y ; apt-get autoclean -y ; apt-get clean ; find /var/lib/apt -type f -exec rm \"{}\" \\;"
@@ -368,6 +388,10 @@ EOF
 
 		Dir::Cache::pkgcache "";
 		Dir::Cache::srcpkgcache "";
+		EOF
+
+		cat > "${TARGET_OUTPUT}/etc/apt/apt.conf.d/docker-no-check-valid" <<-'EOF'
+		Acquire::Check-Valid-Until "0";
 		EOF
 
 		cat > "${TARGET_OUTPUT}/etc/apt/apt.conf.d/docker-no-languages" <<-'EOF'
