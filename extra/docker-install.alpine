@@ -145,7 +145,7 @@ fn_del() {
 }
 
 fn_clean() {
-	rm -rf /var/cache/apk/* /tmp/install.log /tmp/scripts
+	rm -rf /qemu_sh_*.core /var/cache/apk/* /tmp/install.log /tmp/scripts
 }
 
 

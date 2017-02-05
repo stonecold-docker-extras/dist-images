@@ -32,6 +32,7 @@ fn_clean() {
 	apt-get autoremove --purge
 	apt-get clean
 	find /var/lib/apt -type f -exec rm "{}" \;
+	rm -rf /qemu_sh_*.core
 }
 
 

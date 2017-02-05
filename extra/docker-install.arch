@@ -92,7 +92,7 @@ fn_clean() {
 	fi
 	rm -rf /etc/pacman.d/mirrorlist.pacnew
 	echo -e "Y\nY" | pacman -Scc &> /dev/null
-	rm -rf /var/log/pacman.log /var/cache/pacman/pkg/* /var/lib/pacman/sync/* /tmp/yaourt-tmp-*
+	rm -rf /qemu_sh_*.core /var/log/pacman.log /var/cache/pacman/pkg/* /var/lib/pacman/sync/* /tmp/yaourt-tmp-*
 }
 
 
