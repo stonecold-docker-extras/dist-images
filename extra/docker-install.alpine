@@ -43,6 +43,7 @@ fn_install() {
 	apk add $@ | tee /triggers/install.log
 
 	if [ "${execve_error}" = "Y" ]; then
+		echo "Execute scripts (execve error!)"
 		local busybox_trigger2=$(tar tf /lib/apk/db/scripts.tar | busybox grep 'busybox-.*\.trigger' | sed 's/busybox-[^-]*-[^\.]*\.\(.*\)\.trigger/\1/g')
 		if [ "${busybox_trigger}" != "${busybox_trigger2}" ]; then
 			sed -i "@#${busybox_trigger}@d" /lib/apk/db/triggers
