@@ -38,8 +38,9 @@ fn_usage() {
 fn_make_alpine() {
 	echo "Bootstrap"
 
-	local ALPINE_DIST=edge
-	local ALPINE_MIRROR=http://dl-cdn.alpinelinux.org/alpine
+	local ALPINE_DIST=v3.5
+	#local ALPINE_MIRROR=http://dl-cdn.alpinelinux.org/alpine
+	local ALPINE_MIRROR=http://dl-2.alpinelinux.org/alpine
 
 	local ALPINE_ARCH=${TARGET_ARCH}
 	ALPINE_ARCH=${ALPINE_ARCH/x64/x86_64}
@@ -101,8 +102,10 @@ fn_make_arch() {
 	echo "Bootstrap"
 
 	local PACMAN_MIRRORLIST=
-	local PACMAN_BASE_PKGS=(bash bzip2 coreutils diffutils filesystem findutils gettext glibc grep gzip less pacman perl procps-ng sed shadow systemd)
-	local PACMAN_EXTRA_PKGS=()
+	#local PACMAN_BASE_PKGS=(bash bzip2 coreutils diffutils filesystem findutils gettext glibc grep gzip less pacman perl procps-ng sed shadow systemd)
+	local PACMAN_BASE_PKGS="bash coreutils diffutils filesystem findutils gettext glibc grep gzip less pacman procps-ng sed systemd"
+	local PACMAN_REMOVE_PKGS="diffutils gettext gzip less procps-ng"
+	local PACMAN_EXTRA_PKGS=""
 	local ARCH_KEYRING=
 
 	local ARCH_ARCH=${TARGET_ARCH}
@@ -117,11 +120,11 @@ fn_make_arch() {
 	if [ "${ARCH_ARCH}" = "armv7h" -o "${ARCH_ARCH}" = "aarch64" ]; then
 		#PACMAN_MIRRORLIST='Server = http://mirror.archlinuxarm.org/$arch/$repo'
 		PACMAN_MIRRORLIST='Server = http://ca.us.mirror.archlinuxarm.org/$arch/$repo'
-		PACMAN_EXTRA_PKGS=('archlinuxarm-keyring' 'haveged')
+		PACMAN_EXTRA_PKGS="archlinuxarm-keyring haveged"
 		ARCH_KEYRING="archlinuxarm"
 	else
 		PACMAN_MIRRORLIST='Server = http://ftp.kaist.ac.kr/ArchLinux/$repo/os/$arch'
-		PACMAN_EXTRA_PKGS=('haveged')
+		PACMAN_EXTRA_PKGS="haveged"
 		ARCH_KEYRING="archlinux"
 	fi
 
@@ -161,7 +164,7 @@ EOF
 		cp extra/${TARGET_QEMU} ${TARGET_OUTPUT}/usr/bin/
 	fi
 
-	pacstrap -C ${PACMAN_CONF} -c -d -G -M ${TARGET_OUTPUT} ${PACMAN_BASE_PKGS[@]} ${PACMAN_EXTRA_PKGS[@]}
+	pacstrap -C ${PACMAN_CONF} -c -d -G -M ${TARGET_OUTPUT} ${PACMAN_BASE_PKGS} ${PACMAN_EXTRA_PKGS}
 
 	echo
 
@@ -174,10 +177,13 @@ nameserver 8.8.4.4
 EOF
 
 	#systemd-sysusers
-	arch-chroot ${TARGET_OUTPUT} /usr/bin/systemd-sysusers
+	if [ -e "${TARGET_OUTPUT}/usr/bin/systemd-sysusers" ]; then
+		arch-chroot ${TARGET_OUTPUT} /usr/bin/systemd-sysusers
+	fi
 
 	#keyring
-	arch-chroot ${TARGET_OUTPUT} /bin/sh -c "haveged ; rm -fr /etc/pacman.d/gnupg ; pacman-key --init ; pacman-key --populate ${ARCH_KEYRING} ; pkill haveged ; pkill gpg-agent ; pacman -Rsn --noconfirm haveged"
+	#arch-chroot ${TARGET_OUTPUT} /bin/sh -c "haveged ; rm -fr /etc/pacman.d/gnupg ; pacman-key --init ; pacman-key --populate ${ARCH_KEYRING} ; pkill haveged ; pkill gpg-agent ; pacman -Rsn --noconfirm haveged"
+	arch-chroot ${TARGET_OUTPUT} /bin/sh -c "haveged ; rm -fr /etc/pacman.d/gnupg ; pacman-key --init ; pacman-key --populate ${ARCH_KEYRING} ; pacman -Rsn --noconfirm haveged"
 
 	#basic config
 	echo "${PACMAN_MIRRORLIST}" > ${TARGET_OUTPUT}/etc/pacman.d/mirrorlist
@@ -209,6 +215,8 @@ EOF
 	echo
 
 	echo "Clearing"
+
+	arch-chroot ${TARGET_OUTPUT} /bin/sh -c "pacman -Rsn --noconfirm ${PACMAN_REMOVE_PKGS}"
 
 	rm -rf "${PACMAN_CONF}"
 
@@ -420,25 +428,25 @@ EOF
 
 fn_common() {
 	if [ "${TARGET_TYPE}" = "docker" ]; then
-		# udev doesn't work in containers, rebuild /dev
-		local TARGET_DEV=${TARGET_OUTPUT}/dev
-		rm -rf ${TARGET_OUTPUT}/dev
-		mkdir -p ${TARGET_OUTPUT}/dev
-		mknod -m 666 ${TARGET_OUTPUT}/dev/null c 1 3
-		mknod -m 666 ${TARGET_OUTPUT}/dev/zero c 1 5
-		mknod -m 666 ${TARGET_OUTPUT}/dev/random c 1 8
-		mknod -m 666 ${TARGET_OUTPUT}/dev/urandom c 1 9
-		mkdir -m 755 ${TARGET_OUTPUT}/dev/pts
-		mkdir -m 1777 ${TARGET_OUTPUT}/dev/shm
-		mknod -m 666 ${TARGET_OUTPUT}/dev/tty c 5 0
-		mknod -m 600 ${TARGET_OUTPUT}/dev/console c 5 1
-		mknod -m 666 ${TARGET_OUTPUT}/dev/tty0 c 4 0
-		mknod -m 666 ${TARGET_OUTPUT}/dev/full c 1 7
-		mknod -m 600 ${TARGET_OUTPUT}/dev/initctl p
-		mknod -m 666 ${TARGET_OUTPUT}/dev/ptmx c 5 2
-		ln -sf /proc/self/fd ${TARGET_OUTPUT}/dev/fd
+		## udev doesn't work in containers, rebuild /dev
+		#local TARGET_DEV=${TARGET_OUTPUT}/dev
+		#rm -rf ${TARGET_OUTPUT}/dev
+		#mkdir -p ${TARGET_OUTPUT}/dev
+		#mknod -m 666 ${TARGET_OUTPUT}/dev/null c 1 3
+		#mknod -m 666 ${TARGET_OUTPUT}/dev/zero c 1 5
+		#mknod -m 666 ${TARGET_OUTPUT}/dev/random c 1 8
+		#mknod -m 666 ${TARGET_OUTPUT}/dev/urandom c 1 9
+		#mkdir -m 755 ${TARGET_OUTPUT}/dev/pts
+		#mkdir -m 1777 ${TARGET_OUTPUT}/dev/shm
+		#mknod -m 666 ${TARGET_OUTPUT}/dev/tty c 5 0
+		#mknod -m 600 ${TARGET_OUTPUT}/dev/console c 5 1
+		#mknod -m 666 ${TARGET_OUTPUT}/dev/tty0 c 4 0
+		#mknod -m 666 ${TARGET_OUTPUT}/dev/full c 1 7
+		#mknod -m 600 ${TARGET_OUTPUT}/dev/initctl p
+		#mknod -m 666 ${TARGET_OUTPUT}/dev/ptmx c 5 2
+		#ln -sf /proc/self/fd ${TARGET_OUTPUT}/dev/fd
 
-		echo "Docker Import"
+		echo "Update image"
 
 		./update-image.sh -d ${TARGET_DISTRO} -a ${TARGET_ARCH} -i -f -q
 
