@@ -39,8 +39,8 @@ fn_make_alpine() {
 	echo "Bootstrap"
 
 	local ALPINE_DIST=v3.5
-	#local ALPINE_MIRROR=http://dl-cdn.alpinelinux.org/alpine
-	local ALPINE_MIRROR=http://dl-2.alpinelinux.org/alpine
+	local ALPINE_MIRROR=http://dl-cdn.alpinelinux.org/alpine
+	#local ALPINE_MIRROR=http://dl-2.alpinelinux.org/alpine
 
 	local ALPINE_ARCH=${TARGET_ARCH}
 	ALPINE_ARCH=${ALPINE_ARCH/x64/x86_64}
