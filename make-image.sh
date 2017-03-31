@@ -103,8 +103,8 @@ fn_make_arch() {
 
 	local PACMAN_MIRRORLIST=
 	#local PACMAN_BASE_PKGS=(bash bzip2 coreutils diffutils filesystem findutils gettext glibc grep gzip less pacman perl procps-ng sed shadow systemd)
-	local PACMAN_BASE_PKGS="bash coreutils diffutils filesystem findutils gettext glibc grep gzip less pacman procps-ng sed systemd"
-	local PACMAN_REMOVE_PKGS="diffutils gettext gzip less procps-ng"
+	local PACMAN_BASE_PKGS="bash coreutils diffutils filesystem findutils gettext glibc grep gzip less pacman procps-ng sed systemd haveged"
+	local PACMAN_REMOVE_PKGS="diffutils gettext gzip less procps-ng haveged"
 	local PACMAN_EXTRA_PKGS=""
 	local ARCH_KEYRING=
 
@@ -120,11 +120,11 @@ fn_make_arch() {
 	if [ "${ARCH_ARCH}" = "armv7h" -o "${ARCH_ARCH}" = "aarch64" ]; then
 		#PACMAN_MIRRORLIST='Server = http://mirror.archlinuxarm.org/$arch/$repo'
 		PACMAN_MIRRORLIST='Server = http://ca.us.mirror.archlinuxarm.org/$arch/$repo'
-		PACMAN_EXTRA_PKGS="archlinuxarm-keyring haveged"
+		PACMAN_EXTRA_PKGS="archlinuxarm-keyring"
 		ARCH_KEYRING="archlinuxarm"
 	else
 		PACMAN_MIRRORLIST='Server = http://ftp.kaist.ac.kr/ArchLinux/$repo/os/$arch'
-		PACMAN_EXTRA_PKGS="haveged"
+		PACMAN_EXTRA_PKGS=""
 		ARCH_KEYRING="archlinux"
 	fi
 
@@ -183,7 +183,7 @@ EOF
 
 	#keyring
 	#arch-chroot ${TARGET_OUTPUT} /bin/sh -c "haveged ; rm -fr /etc/pacman.d/gnupg ; pacman-key --init ; pacman-key --populate ${ARCH_KEYRING} ; pkill haveged ; pkill gpg-agent ; pacman -Rsn --noconfirm haveged"
-	arch-chroot ${TARGET_OUTPUT} /bin/sh -c "haveged ; rm -fr /etc/pacman.d/gnupg ; pacman-key --init ; pacman-key --populate ${ARCH_KEYRING} ; pacman -Rsn --noconfirm haveged"
+	arch-chroot ${TARGET_OUTPUT} /bin/sh -c "haveged ; rm -fr /etc/pacman.d/gnupg ; pacman-key --init ; pacman-key --populate ${ARCH_KEYRING}"
 
 	#basic config
 	echo "${PACMAN_MIRRORLIST}" > ${TARGET_OUTPUT}/etc/pacman.d/mirrorlist
@@ -216,7 +216,9 @@ EOF
 
 	echo "Clearing"
 
-	arch-chroot ${TARGET_OUTPUT} /bin/sh -c "pacman -Rsn --noconfirm ${PACMAN_REMOVE_PKGS}"
+	if [ ! -z "${PACMAN_REMOVE_PKGS}" ]; then
+		arch-chroot ${TARGET_OUTPUT} /bin/sh -c "pacman -Rsn --noconfirm ${PACMAN_REMOVE_PKGS}"
+	fi
 
 	rm -rf "${PACMAN_CONF}"
 
