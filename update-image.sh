@@ -111,18 +111,26 @@ if [ "${TARGET_PUSH}" = "Y" ]; then
 fi
 
 #qemu check
-if [ "${TARGET_ARCH}" = "armhf" ]; then
-	if [ ! -e /proc/sys/fs/binfmt_misc/arm ]; then
+if [ ! -e /.dockerenv ]; then
+	if [ "${TARGET_ARCH}" = "armhf" ]; then
+		if [ ! -e /proc/sys/fs/binfmt_misc/arm ]; then
 			echo "Cross compile needs binfmt"
-			exit 1
+			#exit 1
+		fi
+		TARGET_QEMU=qemu-arm-static
+	elif [ "${TARGET_ARCH}" = "aarch64" ]; then
+		if [ ! -e /proc/sys/fs/binfmt_misc/aarch64 ]; then
+			echo "Cross compile needs binfmt"
+			#exit 1
+		fi
+		TARGET_QEMU=qemu-aarch64-static
 	fi
-	TARGET_QEMU=qemu-arm-static
-elif [ "${TARGET_ARCH}" = "aarch64" ]; then
-	if [ ! -e /proc/sys/fs/binfmt_misc/aarch64 ]; then
-		echo "Cross compile needs binfmt"
-		exit 1
+else
+	if [ "${TARGET_ARCH}" = "armhf" ]; then
+		TARGET_QEMU=qemu-arm-static
+	elif [ "${TARGET_ARCH}" = "aarch64" ]; then
+		TARGET_QEMU=qemu-aarch64-static
 	fi
-	TARGET_QEMU=qemu-aarch64-static
 fi
 
 #confirm
@@ -253,9 +261,11 @@ if [ "${TARGET_UPDATE}" = "Y" ]; then
 	fi
 	
 	if [ ! -z "${TARGET_QEMU}" ]; then
-		QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C arch-chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve -0 /bin/sh /bin/sh -c "docker-install -r -u -c"
+		#QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C arch-chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve -0 /bin/sh /bin/sh -c "docker-install -r -u -c"
+		QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve -0 /bin/sh /bin/sh -c "docker-install -r -u -c"
 	else
-		PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C arch-chroot "${TARGET_OUTPUT}" /bin/sh -c "docker-install -r -u -c"
+		#PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C arch-chroot "${TARGET_OUTPUT}" /bin/sh -c "docker-install -r -u -c"
+		PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C chroot "${TARGET_OUTPUT}" /bin/sh -c "docker-install -r -u -c"
 	fi
 
 	if [ -e "${TARGET_OUTPUT}/etc/arch-release" ]; then
@@ -288,6 +298,8 @@ if [ -e "${TARGET_OUTPUT}/etc/os-release"  ]; then
 	fi
 fi
 
+#clean
+rm -rf ${TARGET_OUTPUT}/qemu_*.core
 
 if [ "${TARGET_IMPORT}" = "Y" ]; then
 	for id in $(docker ps -a -q -f ancestor=${TARGET_NAME})

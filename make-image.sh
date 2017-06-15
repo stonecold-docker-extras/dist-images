@@ -30,6 +30,7 @@ fn_usage() {
 	echo "          [-z timezone] : timezone (default : Asia/Seoul)"
 	echo "          [-c] : compress image (default : false)"
 	echo "          [-r] : remove rootdir (default : false)"
+	echo "          [-k] : import docker (default : false)"
 	echo "          [-i include pacakges] : include pacakges (default : null)"
 	echo "          [-e exclude pacakges] : exclude pacakges (default : null)"
 	exit 1
@@ -38,7 +39,10 @@ fn_usage() {
 fn_make_alpine() {
 	echo "Bootstrap"
 
-	local ALPINE_DIST=v3.5
+	local ALPINE_DIST=v3.6
+	ALPINE_DIST="$(wget http://dl-cdn.alpinelinux.org/alpine -q -O - | grep '<a href="v' | tail -1 | sed -e 's/^<a href="\(.*\)\/">.*$/\1/g')"
+	ALPINE_DIST="${ALPINE_DIST:-v3.6}"
+	echo "Current version : ${ALPINE_DIST}"
 	local ALPINE_MIRROR=http://dl-cdn.alpinelinux.org/alpine
 	#local ALPINE_MIRROR=http://dl-2.alpinelinux.org/alpine
 
@@ -72,8 +76,13 @@ EOF
 
 	#timezone
 	echo "${TARGET_TIMEZONE}" > ${TARGET_OUTPUT}/etc/TZ
-	PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" chroot "${TARGET_OUTPUT}" apk update
-	PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" chroot "${TARGET_OUTPUT}" setup-timezone -z Asia/Seoul
+	if [ "${TARGET_ARCH}" = "armhf" -a ! -e /proc/sys/fs/binfmt_misc/arm ] || [ "${TARGET_ARCH}" = "aarch64" -a ! -e /proc/sys/fs/binfmt_misc/aarch64 ]; then
+		QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve -0 /bin/sh /bin/sh -c "apk update"
+		QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve -0 /bin/sh /bin/sh -c "setup-timezone -z Asia/Seoul"
+	else
+		PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" chroot "${TARGET_OUTPUT}" apk update
+		PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" chroot "${TARGET_OUTPUT}" setup-timezone -z Asia/Seoul
+	fi
 
 	echo
 
@@ -98,6 +107,11 @@ fn_make_arch() {
 		echo "Could not find arch-chroot. Run pacman -S arch-install-scripts"
 		exit 1
 	fi
+
+	#if ! chroot --help &>/dev/null ; then
+	#	echo "Could not find chroot."
+	#	exit 1
+	#fi
 
 	echo "Bootstrap"
 
@@ -179,11 +193,13 @@ EOF
 	#systemd-sysusers
 	if [ -e "${TARGET_OUTPUT}/usr/bin/systemd-sysusers" ]; then
 		arch-chroot ${TARGET_OUTPUT} /usr/bin/systemd-sysusers
+		#chroot ${TARGET_OUTPUT} /usr/bin/systemd-sysusers
 	fi
 
 	#keyring
 	#arch-chroot ${TARGET_OUTPUT} /bin/sh -c "haveged ; rm -fr /etc/pacman.d/gnupg ; pacman-key --init ; pacman-key --populate ${ARCH_KEYRING} ; pkill haveged ; pkill gpg-agent ; pacman -Rsn --noconfirm haveged"
 	arch-chroot ${TARGET_OUTPUT} /bin/sh -c "haveged ; rm -fr /etc/pacman.d/gnupg ; pacman-key --init ; pacman-key --populate ${ARCH_KEYRING}"
+	#chroot ${TARGET_OUTPUT} /bin/sh -c "haveged ; rm -fr /etc/pacman.d/gnupg ; pacman-key --init ; pacman-key --populate ${ARCH_KEYRING}"
 
 	#basic config
 	echo "${PACMAN_MIRRORLIST}" > ${TARGET_OUTPUT}/etc/pacman.d/mirrorlist
@@ -191,8 +207,13 @@ EOF
 	sed -i "s/#\(NoUpgrade   =\)/\1 \/etc\/pacman.d\/mirrorlist/g" ${TARGET_OUTPUT}/etc/pacman.conf
 
 	#locale
+	sed -i "s/#en_US.UTF-8/en_US.UTF-8/g" ${TARGET_OUTPUT}/etc/locale.gen
 	sed -i "s/#${TARGET_LOCALE}/${TARGET_LOCALE}/g" ${TARGET_OUTPUT}/etc/locale.gen
 	arch-chroot ${TARGET_OUTPUT} locale-gen
+	#chroot ${TARGET_OUTPUT} locale-gen
+	if [ ! -e ${TARGET_OUTPUT}/usr/lib/locale/locale-archive ]; then
+		cp extra/locale-archive ${TARGET_OUTPUT}/usr/lib/locale/
+	fi
 	echo "LANG=${TARGET_LOCALE}" >> ${TARGET_OUTPUT}/etc/locale.conf
 	echo "LC_ALL=${TARGET_LOCALE}" >> ${TARGET_OUTPUT}/etc/locale.conf
 
@@ -218,6 +239,7 @@ EOF
 
 	if [ ! -z "${PACMAN_REMOVE_PKGS}" ]; then
 		arch-chroot ${TARGET_OUTPUT} /bin/sh -c "pacman -Rsn --noconfirm ${PACMAN_REMOVE_PKGS}"
+		#chroot ${TARGET_OUTPUT} /bin/sh -c "pacman -Rsn --noconfirm ${PACMAN_REMOVE_PKGS}"
 	fi
 
 	rm -rf "${PACMAN_CONF}"
@@ -233,6 +255,9 @@ EOF
 
 fn_make_debian() {
 	local DEBIAN_DIST=jessie
+	DEBIAN_DIST="$(wget http://ftp.kaist.ac.kr/debian/dists/README -q -O - | grep '^stable,' | sed -e 's/^stable, or \([^ ]\+\)\s\+.*$/\1/g')"
+	DEBIAN_DIST="${DEBIAN_DIST:-jessie}"
+	echo "Current version : ${DEBIAN_DIST}"
 	local DEBIAN_MIRROR=http://ftp.kr.debian.org/debian
 	local DEBIAN_EXTRA=locales
 
@@ -246,6 +271,9 @@ fn_make_debian() {
 
 fn_make_ubuntu() {
 	local DEBIAN_DIST=xenial
+	DEBIAN_DIST="$(wget http://ftp.kaist.ac.kr/ubuntu/dists/ -q -O - | grep -v 'backports' | grep -v 'proposed' | grep -v 'security' | grep -v 'updates' | grep '<tr><td class="n">' | tail -1  | sed -e 's/^<tr><td class="n"><a href="\(.*\)\/">.*$/\1/g')"
+	DEBIAN_DIST="${DEBIAN_DIST:-xenial}"
+	echo "Current version : ${DEBIAN_DIST}"
 	local DEBIAN_MIRROR=
 	local DEBIAN_EXTRA=
 
@@ -265,8 +293,9 @@ fn_make_ubuntu() {
 
 fn_make_debian_common() {
 	if ! debootstrap --help &>/dev/null ; then
-		echo "Could not find debootstrap. Run pacman -S debootstrap"
-		exit 1
+		#echo "Could not find debootstrap. Run pacman -S debootstrap"
+		#exit 1
+		pacman -Suy --noconfirm debootstrap
 	fi
 
 	alias apt-get="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin LANG=C LC_ALL=C DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true /usr/bin/apt-get -o Acquire::Languages=none -o Acquire::GzipIndexes=true -o Acquire::CompressionTypes::Order::=gz -o APT::Install-Recommends=false -o APT::Install-Suggests=false" 
@@ -290,10 +319,18 @@ fn_make_debian_common() {
 		PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true debootstrap --foreign ${DEBIAN_OPTION[@]} ${DEBIAN_DIST} ${TARGET_OUTPUT} ${DEBIAN_MIRROR}
 
 		echo "debootstrap 2nd"
-		PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true chroot "${TARGET_OUTPUT}" /debootstrap/debootstrap --second-stage
+		if [ "${TARGET_ARCH}" = "armhf" -a ! -e /proc/sys/fs/binfmt_misc/arm ] || [ "${TARGET_ARCH}" = "aarch64" -a ! -e /proc/sys/fs/binfmt_misc/aarch64 ]; then
+			QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve -0 /bin/sh /bin/sh -c "/debootstrap/debootstrap --second-stage"
+		else
+			PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true chroot "${TARGET_OUTPUT}" /debootstrap/debootstrap --second-stage
+		fi
 
 		echo "debootstrap 3rd"
-		PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true chroot "${TARGET_OUTPUT}" dpkg --configure -a
+		if [ "${TARGET_ARCH}" = "armhf" -a ! -e /proc/sys/fs/binfmt_misc/arm ] || [ "${TARGET_ARCH}" = "aarch64" -a ! -e /proc/sys/fs/binfmt_misc/aarch64 ]; then
+			QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve -0 /bin/sh /usr/bin/dpkg --configure -a
+		else
+			PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true chroot "${TARGET_OUTPUT}" /usr/bin/dpkg --configure -a
+		fi
 	else
 		echo "debootstrap"
 		PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C DEBIAN_FRONTEND=noninteractive debootstrap ${DEBIAN_OPTION[@]} ${DEBIAN_DIST} ${TARGET_OUTPUT} ${DEBIAN_MIRROR}
@@ -306,8 +343,16 @@ nameserver 8.8.4.4
 EOF
 
 	#locale
+	sed -i "s/# en_US.UTF-8/en_US.UTF-8/g" ${TARGET_OUTPUT}/etc/locale.gen
 	sed -i "s/# ${TARGET_LOCALE}/${TARGET_LOCALE}/g" ${TARGET_OUTPUT}/etc/locale.gen
-	PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C chroot "${TARGET_OUTPUT}" locale-gen
+	if [ "${TARGET_ARCH}" = "armhf" -a ! -e /proc/sys/fs/binfmt_misc/arm ] || [ "${TARGET_ARCH}" = "aarch64" -a ! -e /proc/sys/fs/binfmt_misc/aarch64 ]; then
+		QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve -0 /bin/sh /bin/sh -c "/usr/sbin/locale-gen"
+	else
+		PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C chroot "${TARGET_OUTPUT}" /usr/sbin/locale-gen
+	fi
+	if [ ! -e ${TARGET_OUTPUT}/usr/lib/locale/locale-archive ]; then
+		cp extra/locale-archive ${TARGET_OUTPUT}/usr/lib/locale/
+	fi
 	echo "LANG=${TARGET_LOCALE}" >> ${TARGET_OUTPUT}/etc/default/locale
 	echo "LANGUAGE=${TARGET_LOCALE}" >> ${TARGET_OUTPUT}/etc/default/locale
 	echo "LC_ALL=${TARGET_LOCALE}" >> ${TARGET_OUTPUT}/etc/default/locale
@@ -450,7 +495,11 @@ fn_common() {
 
 		echo "Update image"
 
-		./update-image.sh -d ${TARGET_DISTRO} -a ${TARGET_ARCH} -i -f -q
+		if [ "${TARGET_DOCKER}" = "Y" ]; then
+			./update-image.sh -d ${TARGET_DISTRO} -a ${TARGET_ARCH} -i -f -q
+		else
+			./update-image.sh -d ${TARGET_DISTRO} -a ${TARGET_ARCH} -f -q
+		fi
 
 		echo
 	fi
@@ -488,6 +537,7 @@ TARGET_OUTPUT=
 TARGET_TYPE=
 TARGET_LOCALE=
 TARGET_TIMEZONE=
+TARGET_DOCKER=
 TARGET_NAME=
 TARGET_QEMU=
 
@@ -510,6 +560,7 @@ do
 		-t|--type) TARGET_TYPE="${2}" ; shift 1 ;;
 		-l|--locale) TARGET_LOCALE="${2}" ; shift 1 ;;
 		-z|--timezone) TARGET_TIMEZONE="${2}" ; shift 1 ;;
+		-k|--docker) TARGET_DOCKER="Y" ;;
 		-c|--compress) TARGET_COMPRESS="Y" ;;
 		-r|--rm) TARGET_REMOVE="Y" ;;
 		-i|--include) INCLUDE_PACKAGES="${2}" ; shift 1 ;;
@@ -557,6 +608,9 @@ fi
 if [ -z "${TARGET_TIMEZONE}" ]; then
 	TARGET_TIMEZONE=Asia/Seoul
 fi
+if [ -z "${TARGET_DOCKER}" ]; then
+	TARGET_DOCKER="N"
+fi
 if [ "${TARGET_COMPRESS}" != "Y" ]; then
 	TARGET_COMPRESS="N"
 fi
@@ -572,18 +626,26 @@ else
 fi
 
 #qemu check
-if [ "${TARGET_ARCH}" = "armhf" -o "${TARGET_ARCH}" = "armel" ]; then
-	if [ ! -e /proc/sys/fs/binfmt_misc/arm ]; then
+if [ ! -e /.dockerenv ]; then
+	if [ "${TARGET_ARCH}" = "armhf" ]; then
+		if [ ! -e /proc/sys/fs/binfmt_misc/arm ]; then
 			echo "Cross compile needs binfmt"
-			exit 1
+			#exit 1
+		fi
+		TARGET_QEMU=qemu-arm-static
+	elif [ "${TARGET_ARCH}" = "aarch64" ]; then
+		if [ ! -e /proc/sys/fs/binfmt_misc/aarch64 ]; then
+			echo "Cross compile needs binfmt"
+			#exit 1
+		fi
+		TARGET_QEMU=qemu-aarch64-static
 	fi
-	TARGET_QEMU=qemu-arm-static
-elif [ "${TARGET_ARCH}" = "aarch64" ]; then
-	if [ ! -e /proc/sys/fs/binfmt_misc/aarch64 ]; then
-		echo "Cross compile needs binfmt"
-		exit 1
+else
+	if [ "${TARGET_ARCH}" = "armhf" ]; then
+		TARGET_QEMU=qemu-arm-static
+	elif [ "${TARGET_ARCH}" = "aarch64" ]; then
+		TARGET_QEMU=qemu-aarch64-static
 	fi
-	TARGET_QEMU=qemu-aarch64-static
 fi
 
 #confirm
@@ -638,4 +700,7 @@ fi
 
 #execute
 eval fn_make_${TARGET_DISTRO}
+
+#clean
+rm -rf ${TARGET_OUTPUT}/qemu_*.core
 
