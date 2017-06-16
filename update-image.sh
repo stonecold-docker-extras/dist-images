@@ -251,21 +251,23 @@ fi
 #update
 prev_md5=
 post_md5=
+PATH_CHROOT=
 if [ "${TARGET_UPDATE}" = "Y" ]; then
 	if [ -e "${TARGET_OUTPUT}/etc/arch-release" ]; then
 		prev_md5=$(tar -cf - ${TARGET_OUTPUT}/var/lib/pacman/local 2> /dev/null | md5sum | cut -f 1 -d ' ')
+		PATH_CHROOT="/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl"
 	elif [ -e "${TARGET_OUTPUT}/etc/os-release" -a ! -z "$(grep "ID=\(debian\|ubuntu\)" "${TARGET_OUTPUT}/etc/os-release")" ]; then
 		prev_md5=$(tar -cf - ${TARGET_OUTPUT}/var/lib/dpkg/info 2> /dev/null | md5sum | cut -f 1 -d ' ')
+		PATH_CHROOT="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 	elif [ -e "${TARGET_OUTPUT}/etc/alpine-release" ]; then
 		prev_md5=$(md5sum ${TARGET_OUTPUT}/lib/apk/db/installed | cut -f 1 -d ' ')
+		PATH_CHROOT=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 	fi
 	
-	if [ ! -z "${TARGET_QEMU}" ]; then
-		#QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C arch-chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve -0 /bin/sh /bin/sh -c "docker-install -r -u -c"
-		QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve -0 /bin/sh /bin/sh -c "docker-install -r -u -c"
+	if [ "${TARGET_ARCH}" = "armhf" -a ! -e /proc/sys/fs/binfmt_misc/arm ] || [ "${TARGET_ARCH}" = "aarch64" -a ! -e /proc/sys/fs/binfmt_misc/aarch64 ]; then
+		QEMU_EXECVE=1 PATH="${PATH_CHROOT}" LANG=C LC_ALL=C chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve -0 /bin/sh /bin/sh -c "docker-install -r -u -c"
 	else
-		#PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C arch-chroot "${TARGET_OUTPUT}" /bin/sh -c "docker-install -r -u -c"
-		PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C chroot "${TARGET_OUTPUT}" /bin/sh -c "docker-install -r -u -c"
+		PATH="${PATH_CHROOT}" LANG=C LC_ALL=C chroot "${TARGET_OUTPUT}" /bin/sh -c "docker-install -r -u -c"
 	fi
 
 	if [ -e "${TARGET_OUTPUT}/etc/arch-release" ]; then

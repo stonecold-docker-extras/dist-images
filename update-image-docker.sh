@@ -165,7 +165,7 @@ EOF
 		exit 1
 	fi
 
-	dockercmd -z run -v `pwd`:/build -v ${run_alt}:/usr/local/bin/docker-run-alt $([ -e `pwd`/extra/qemu-arm-static ] && echo "-v `pwd`/extra/qemu-arm-static:/usr/bin/qemu-arm-static") $([ -e `pwd`/extra/qemu-aarch64-static ] && echo "-v `pwd`/extra/qemu-aarch64-static:/usr/bin/qemu-aarch64-static") arch-dev
+	dockercmd -q -z run -v `pwd`:/build -v ${run_alt}:/usr/local/bin/docker-run-alt $([ -e `pwd`/extra/qemu-arm-static ] && echo "-v `pwd`/extra/qemu-arm-static:/usr/bin/qemu-arm-static") $([ -e `pwd`/extra/qemu-aarch64-static ] && echo "-v `pwd`/extra/qemu-aarch64-static:/usr/bin/qemu-aarch64-static") arch-dev
 	rm -rf "${run_alt}"
 fi
 
