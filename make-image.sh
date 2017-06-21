@@ -274,7 +274,7 @@ EOF
 fn_make_debian() {
 	local DEBIAN_DIST=jessie
 	DEBIAN_DIST="$(curl -sSL http://ftp.kaist.ac.kr/debian/dists/README | grep '^stable,' | sed -e 's/^stable, or \([^ ]\+\)\s\+.*$/\1/g')"
-	DEBIAN_DIST="${DEBIAN_DIST:-jessie}"
+	DEBIAN_DIST="${DEBIAN_DIST:-stretch}"
 	echo "Current version : ${DEBIAN_DIST}"
 	local DEBIAN_MIRROR=http://ftp.kr.debian.org/debian
 	local DEBIAN_EXTRA=locales
