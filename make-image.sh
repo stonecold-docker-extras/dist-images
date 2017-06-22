@@ -134,7 +134,7 @@ fn_make_arch() {
 		PACMAN_EXTRA_PKGS="archlinuxarm-keyring"
 		ARCH_KEYRING="archlinuxarm"
 	else
-		PACMAN_MIRRORLIST='Server = http://ftp.kaist.ac.kr/ArchLinux/$repo/os/$arch'
+		PACMAN_MIRRORLIST='Server = http://mirror.premi.st/archlinux/$repo/os/$arch'
 		PACMAN_EXTRA_PKGS=""
 		ARCH_KEYRING="archlinux"
 	fi
