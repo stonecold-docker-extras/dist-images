@@ -180,6 +180,9 @@ if [ -e "${TARGET_OUTPUT}/etc/arch-release" ]; then
 	cp -f extra/docker-install.arch ${TARGET_OUTPUT}/usr/local/bin/docker-install
 	cp extra/docker-sysusers ${TARGET_OUTPUT}/usr/local/bin/
 	#cp extra/docker-tmpfiles ${TARGET_OUTPUT}/usr/local/bin/
+	if [ ! -e "${TARGET_OUTPUT}/usr/lib/locale/locale-archive" ]; then
+		cp extra/locale-archive ${TARGET_OUTPUT}/usr/lib/locale/
+	fi
 elif [ -e "${TARGET_OUTPUT}/etc/os-release" -a ! -z "$(grep "ID=\(debian\|ubuntu\)" "${TARGET_OUTPUT}/etc/os-release")" ]; then
 	cp -f extra/docker-install.deb ${TARGET_OUTPUT}/usr/local/bin/docker-install
 elif [ -e "${TARGET_OUTPUT}/etc/alpine-release" ]; then
