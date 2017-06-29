@@ -115,7 +115,8 @@ fn_make_arch() {
 	local PACMAN_MIRRORLIST=
 	#local PACMAN_BASE_PKGS=(bash bzip2 coreutils diffutils filesystem findutils gettext glibc grep gzip less pacman perl procps-ng sed shadow systemd)
 	local PACMAN_BASE_PKGS="bash coreutils diffutils filesystem findutils gettext glibc grep gzip less pacman procps-ng sed systemd haveged"
-	local PACMAN_REMOVE_PKGS="diffutils gettext gzip less procps-ng haveged"
+	#local PACMAN_REMOVE_PKGS="diffutils gettext gzip less procps-ng haveged"
+	local PACMAN_REMOVE_PKGS="gzip less procps-ng haveged"
 	local PACMAN_EXTRA_PKGS=""
 	local ARCH_KEYRING=
 
@@ -236,17 +237,17 @@ EOF
 	#skel
 	cp -ar ${TARGET_OUTPUT}/etc/skel/. ${TARGET_OUTPUT}/root/
 
-	##yaourt
-	#if [ -e extra/package-query-*-${ARCH_ARCH}.pkg.tar.xz -a -e extra/yaourt-*-any.pkg.tar.xz ]; then
-	#	cp extra/package-query-*-${ARCH_ARCH}.pkg.tar.xz ${TARGET_OUTPUT}/
-	#	cp extra/yaourt-*-any.pkg.tar.xz ${TARGET_OUTPUT}/
-	#	if [ "${TARGET_ARCH}" = "armhf" -a ! -e /proc/sys/fs/binfmt_misc/arm ] || [ "${TARGET_ARCH}" = "aarch64" -a ! -e /proc/sys/fs/binfmt_misc/aarch64 ]; then
-	#		QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve -0 /bin/sh /bin/sh -c "/usr/bin/pacman -U --noconfirm --asdeps /package-query-*; /usr/bin/pacman -U --noconfirm /yaourt-*-any.pkg.tar.xz"
-	#	else
-	#		PATH="/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /bin/sh -c "/usr/bin/pacman -U --noconfirm --asdeps /package-query-*; /usr/bin/pacman -U --noconfirm /yaourt-*-any.pkg.tar.xz"
-	#	fi
-	#	rm -rf ${TARGET_OUTPUT}/*.pkg.tar.xz
-	#fi
+	#yaourt
+	if [ -e extra/package-query-*-${ARCH_ARCH}.pkg.tar.xz -a -e extra/yaourt-*-any.pkg.tar.xz ]; then
+		cp extra/package-query-*-${ARCH_ARCH}.pkg.tar.xz ${TARGET_OUTPUT}/
+		cp extra/yaourt-*-any.pkg.tar.xz ${TARGET_OUTPUT}/
+		if [ "${TARGET_ARCH}" = "armhf" -a ! -e /proc/sys/fs/binfmt_misc/arm ] || [ "${TARGET_ARCH}" = "aarch64" -a ! -e /proc/sys/fs/binfmt_misc/aarch64 ]; then
+			QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve -0 /bin/sh /bin/sh -c "/usr/bin/pacman -Sy --noconfirm ; /usr/bin/pacman -U --noconfirm --asdeps /package-query-*; /usr/bin/pacman -U --noconfirm /yaourt-*-any.pkg.tar.xz"
+		else
+			PATH="/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /bin/sh -c "/usr/bin/pacman -Sy --noconfirm ; /usr/bin/pacman -U --noconfirm --asdeps /package-query-*; /usr/bin/pacman -U --noconfirm /yaourt-*-any.pkg.tar.xz"
+		fi
+		rm -rf ${TARGET_OUTPUT}/*.pkg.tar.xz
+	fi
 
 	echo
 
