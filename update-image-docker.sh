@@ -28,6 +28,13 @@ fn_usage() {
 
 DEBUG=Y
 
+DOCKER_CMD="docker"
+if [ -e /etc/synoinfo.conf ]; then
+	DOCKER_CMD='sudo docker'
+fi
+TAR_CMD="sudo tar"
+
+
 TARGET_DISTRO=
 TARGET_ARCH=
 TARGET_OUTPUT=
@@ -148,7 +155,8 @@ if [ "${FORCE}" != "Y" ]; then
 fi
 
 if [ "${TARGET_UPDATE}" = "Y" ]; then
-	run_alt=/tmp/$(basename "${0}")-docker-run-alt
+	rnd=${RANDOM}
+	run_alt=/tmp/$(basename "${0}")-docker-run-alt-${rnd}
 	rm -rf "${run_alt}"
 	cat << EOF > ${run_alt}
 #!/bin/sh
@@ -165,12 +173,10 @@ EOF
 		exit 1
 	fi
 
-	dockercmd -q -z run -v `pwd`:/build -v ${run_alt}:/usr/local/bin/docker-run-alt $([ -e `pwd`/extra/qemu-arm-static ] && echo "-v `pwd`/extra/qemu-arm-static:/usr/bin/qemu-arm-static") $([ -e `pwd`/extra/qemu-aarch64-static ] && echo "-v `pwd`/extra/qemu-aarch64-static:/usr/bin/qemu-aarch64-static") arch-dev
+	#dockercmd -q -z run -v `pwd`:/build -v ${run_alt}:/usr/local/bin/docker-run-alt $([ -e `pwd`/extra/qemu-arm-static ] && echo "-v `pwd`/extra/qemu-arm-static:/usr/bin/qemu-arm-static") $([ -e `pwd`/extra/qemu-aarch64-static ] && echo "-v `pwd`/extra/qemu-aarch64-static:/usr/bin/qemu-aarch64-static") arch-dev
+	${DOCKER_CMD} run -i -t --rm --sig-proxy=false --privileged -e RUN_USER_NAME=forumi0721 -e RUN_USER_UID=1026 -e RUN_USER_GID=100 -e LANG=ko_KR.UTF-8 -e LC_ALL=ko_KR.UTF-8 -v `pwd`:/build -v ${run_alt}:/usr/local/bin/docker-run-alt $([ -e `pwd`/extra/qemu-arm-static ] && echo "-v `pwd`/extra/qemu-arm-static:/usr/bin/qemu-arm-static") $([ -e `pwd`/extra/qemu-aarch64-static ] && echo "-v `pwd`/extra/qemu-aarch64-static:/usr/bin/qemu-aarch64-static") -v /Workspace:/Workspace -v /Repository:/Repository -v /volume1/@docker_overlay/arch-dev/home_forumi0721:/home/forumi0721 -v /volume1/@docker_overlay/arch-dev/docker-run-pre:/usr/local/bin/docker-run-pre -h arch-x64-dev-${rnd} --name arch-x64-dev-${rnd}  forumi0721archx64/arch-x64-dev:latest
 	rm -rf "${run_alt}"
 fi
-
-DOCKER_CMD="sudo docker"
-TAR_CMD="sudo tar"
 
 if [ "${TARGET_IMPORT}" = "Y" ]; then
 	for id in $(${DOCKER_CMD} ps -a -q -f ancestor=${TARGET_NAME})
