@@ -20,10 +20,10 @@ fn_update() {
 }
 
 fn_install() {
-	if [ -e /usr/local/bin/docker-sysusers ]; then
-		mv /usr/bin/systemd-sysusers /usr/bin/systemd-sysusers.ORG
-		ln -s /usr/local/bin/docker-sysusers /usr/bin/systemd-sysusers
-	fi
+	#if [ -e /usr/local/bin/docker-sysusers ]; then
+	#	mv /usr/bin/systemd-sysusers /usr/bin/systemd-sysusers.ORG
+	#	ln -s /usr/local/bin/docker-sysusers /usr/bin/systemd-sysusers
+	#fi
 
 	if [ "${USE_YAOURT}" = "Y" ]; then
 		yaourt -S --noconfirm ${@}
@@ -31,10 +31,10 @@ fn_install() {
 		pacman -S --noconfirm --quiet ${@}
 	fi
 
-	if [ -e /usr/bin/systemd-sysusers.ORG ]; then
-		rm -rf /usr/bin/systemd-sysusers
-		mv /usr/bin/systemd-sysusers.ORG /usr/bin/systemd-sysusers
-	fi
+	#if [ -e /usr/bin/systemd-sysusers.ORG ]; then
+	#	rm -rf /usr/bin/systemd-sysusers
+	#	mv /usr/bin/systemd-sysusers.ORG /usr/bin/systemd-sysusers
+	#fi
 }
 
 fn_del() {

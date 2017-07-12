@@ -178,7 +178,8 @@ fi
 #docker-install
 if [ -e "${TARGET_OUTPUT}/etc/arch-release" ]; then
 	cp -f extra/docker-install.arch ${TARGET_OUTPUT}/usr/local/bin/docker-install
-	cp extra/docker-sysusers ${TARGET_OUTPUT}/usr/local/bin/
+	rm -rf ${TARGET_OUTPUT}/usr/local/bin/docker-sysusers ${TARGET_OUTPUT}/usr/local/bin/docker-tmpfiles
+	#cp extra/docker-sysusers ${TARGET_OUTPUT}/usr/local/bin/
 	#cp extra/docker-tmpfiles ${TARGET_OUTPUT}/usr/local/bin/
 	if [ ! -e "${TARGET_OUTPUT}/usr/lib/locale/locale-archive" ]; then
 		cp extra/locale-archive ${TARGET_OUTPUT}/usr/lib/locale/
@@ -188,34 +189,40 @@ elif [ -e "${TARGET_OUTPUT}/etc/os-release" -a ! -z "$(grep "ID=\(debian\|ubuntu
 elif [ -e "${TARGET_OUTPUT}/etc/alpine-release" ]; then
 	cp -f extra/docker-install.alpine ${TARGET_OUTPUT}/usr/local/bin/docker-install
 fi
-cp extra/docker-su ${TARGET_OUTPUT}/usr/local/bin/docker-su
+rm -rf ${TARGET_OUTPUT}/usr/local/bin/docker-su
+#cp extra/docker-su ${TARGET_OUTPUT}/usr/local/bin/docker-su
 
 #docker-build
 if [ "${TARGET_ARCH}" = "armhf" ]; then
 	cp -f extra/docker-build-arm "${TARGET_OUTPUT}/usr/local/bin/"
 	ln -sf docker-build-arm "${TARGET_OUTPUT}/usr/local/bin/docker-build-start"
 	ln -sf docker-build-arm "${TARGET_OUTPUT}/usr/local/bin/docker-build-end"
-	if [ -e ${TARGET_OUTPUT}/lib/ld-musl-armhf.so.1 ]; then
-		cp extra/docker-execve-check.armv7h.musl ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check
-	else
-		cp extra/docker-execve-check.armv7h.glibc ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check
-	fi
-	cp extra/docker-execve-check.sh ${TARGET_OUTPUT}/usr/local/bin/
+	rm -rf ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check
+	#if [ -e ${TARGET_OUTPUT}/lib/ld-musl-armhf.so.1 ]; then
+	#	cp extra/docker-execve-check.armv7h.musl ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check
+	#else
+	#	cp extra/docker-execve-check.armv7h.glibc ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check
+	#fi
+	rm -rf ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check.sh
+	#cp extra/docker-execve-check.sh ${TARGET_OUTPUT}/usr/local/bin/
 elif [ "${TARGET_ARCH}" = "aarch64" ]; then
 	cp -f extra/docker-build-aarch64 "${TARGET_OUTPUT}/usr/local/bin/"
 	ln -sf docker-build-aarch64 "${TARGET_OUTPUT}/usr/local/bin/docker-build-start"
 	ln -sf docker-build-aarch64 "${TARGET_OUTPUT}/usr/local/bin/docker-build-end"
-	if [ -e ${TARGET_OUTPUT}/lib/ld-musl-aarch64.so.1 ]; then
-		cp extra/docker-execve-check.aarch64.musl ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check
-	else
-		cp extra/docker-execve-check.aarch64.glibc ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check
-	fi
-	cp extra/docker-execve-check.sh ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check.sh
+	rm -rf ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check
+	#if [ -e ${TARGET_OUTPUT}/lib/ld-musl-aarch64.so.1 ]; then
+	#	cp extra/docker-execve-check.aarch64.musl ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check
+	#else
+	#	cp extra/docker-execve-check.aarch64.glibc ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check
+	#fi
+	rm -rf ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check.sh
+	#cp extra/docker-execve-check.sh ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check.sh
 else
 	cp -f extra/docker-build-x64 "${TARGET_OUTPUT}/usr/local/bin/docker-build"
 	ln -sf docker-build "${TARGET_OUTPUT}/usr/local/bin/docker-build-start"
 	ln -sf docker-build "${TARGET_OUTPUT}/usr/local/bin/docker-build-end"
-	cp extra/docker-execve-check.sh ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check
+	rm -rf ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check
+	#cp extra/docker-execve-check.sh ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check
 fi
 
 #gosu
