@@ -161,6 +161,33 @@ if [ "${FORCE}" != "Y" ]; then
 	fi
 fi
 
+#qemu
+if [ "${TARGET_ARCH}" = "armhf" -o "${TARGET_ARCH}" = "aarch64" ]; then
+	#binfmt
+	if [ ! -e /proc/sys/fs/binfmt_misc/register ]; then
+		mount binfmt_misc -t binfmt_misc /proc/sys/fs/binfmt_misc
+	fi
+	if [ -e /proc/sys/fs/binfmt_misc/register ]; then
+		if [ "${TARGET_ARCH}" = "armhf" ]; then
+			if [ ! -e /usr/bin/qemu-arm-static ]; then
+				cp extra/qemu-arm-static /usr/bin/qemu-arm-static
+			fi
+			if [ ! -e /proc/sys/fs/binfmt_misc/arm -a -e /usr/bin/qemu-arm-static ]; then
+				echo ':arm:M::\x7fELF\x01\x01\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02\x00\x28\x00:\xff\xff\xff\xff\xff\xff\xff\x00\xff\xff\xff\xff\xff\xff\xff\xff\xfe\xff\xff\xff:/usr/bin/qemu-arm-static:' > /proc/sys/fs/binfmt_misc/register
+			fi
+		fi
+
+		if [ "${TARGET_ARCH}" = "aarch64" ]; then
+			if [ ! -e /usr/bin/qemu-aarch64-static ]; then
+				cp extra/qemu-aarch64-static /usr/bin/qemu-aarch64-static
+			fi
+			if [ ! -e /proc/sys/fs/binfmt_misc/aarch64 -a -e /usr/bin/qemu-aarch64-static ]; then
+				echo ':aarch64:M::\x7fELF\x02\x01\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02\x00\xb7\x00:\xff\xff\xff\xff\xff\xff\xff\x00\xff\xff\xff\xff\xff\xff\xff\xff\xfe\xff\xff\xff:/usr/bin/qemu-aarch64-static:' > /proc/sys/fs/binfmt_misc/register
+			fi
+		fi
+	fi
+fi
+
 #resolve
 cat << EOF > ${TARGET_OUTPUT}/etc/resolv.conf
 nameserver 8.8.8.8
@@ -360,10 +387,11 @@ if [ "${TARGET_IMPORT}" = "Y" ]; then
 fi
 
 if [ "${TARGET_PUSH}" = "Y" ]; then
-	if [ ! -z "${SUDO_USER}" ]; then
-		su -s /bin/sh -c "docker push ${TARGET_NAME}:latest" - ${SUDO_USER}
-	else
-		docker push ${TARGET_NAME}:latest
-	fi
+	docker push ${TARGET_NAME}:latest
+	#if [ ! -z "${SUDO_USER}" ]; then
+	#	su -s /bin/sh -c "docker push ${TARGET_NAME}:latest" - ${SUDO_USER}
+	#else
+	#	docker push ${TARGET_NAME}:latest
+	#fi
 fi
 
