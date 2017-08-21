@@ -1,0 +1,12 @@
+#!/bin/sh
+
+rm -rf /usr/share/i18n/charmaps/UTF-8
+gzip -dk /usr/share/i18n/charmaps/UTF-8.gz
+
+/usr/bin/locale-gen "${@}"
+retVal=$?
+
+rm -rf /usr/share/i18n/charmaps/UTF-8
+
+exit ${retVal}
+

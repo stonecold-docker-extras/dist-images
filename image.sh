@@ -106,11 +106,6 @@ fn_make_alpine() {
 	fi
 	local APK_VERSION="$(curl -sSL ${ALPINE_MIRROR}/${ALPINE_DIST}/main/${ALPINE_ARCH}/APKINDEX.tar.gz | tar -Oxz | grep --text '^P:apk-tools-static$' -A1 | tail -n1 | cut -d: -f2)"
 	curl -sSL ${ALPINE_MIRROR}/${ALPINE_DIST}/main/${ALPINE_ARCH}/apk-tools-static-${APK_VERSION}.apk | tar -xz -C "${TARGET_OUTPUT}" sbin/apk.static  2>/dev/null
-	#if [ "${TARGET_ARCH}" = "armhf" -a ! -e /proc/sys/fs/binfmt_misc/arm ] || [ "${TARGET_ARCH}" = "aarch64" -a ! -e /proc/sys/fs/binfmt_misc/aarch64 ]; then
-	#	QEMU_EXECVE=1 /usr/bin/${TARGET_QEMU} -execve ${TARGET_OUTPUT}/sbin/apk.static --repository ${ALPINE_MIRROR}/${ALPINE_DIST}/main --update-cache --allow-untrusted --root "${TARGET_OUTPUT}" --initdb add alpine-base
-	#else
-	#	${TARGET_OUTPUT}/sbin/apk.static --repository ${ALPINE_MIRROR}/${ALPINE_DIST}/main --update-cache --allow-untrusted --root "${TARGET_OUTPUT}" --initdb add alpine-base 
-	#fi
 	if [ "${TARGET_ARCH}" = "armhf" ] || [ "${TARGET_ARCH}" = "aarch64" ]; then
 		QEMU_EXECVE=1 /usr/bin/${TARGET_QEMU} -execve ${TARGET_OUTPUT}/sbin/apk.static --repository ${ALPINE_MIRROR}/${ALPINE_DIST}/main --update-cache --allow-untrusted --root "${TARGET_OUTPUT}" --initdb add alpine-base
 	else
@@ -133,11 +128,6 @@ EOF
 
 	#timezone
 	echo "${TARGET_TIMEZONE}" > ${TARGET_OUTPUT}/etc/TZ
-	#if [ "${TARGET_ARCH}" = "armhf" -a ! -e /proc/sys/fs/binfmt_misc/arm ] || [ "${TARGET_ARCH}" = "aarch64" -a ! -e /proc/sys/fs/binfmt_misc/aarch64 ]; then
-	#	QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve -0 /bin/sh /bin/sh -c "/sbin/apk update ; /sbin/setup-timezone -z ${TARGET_TIMEZONE}"
-	#else
-	#	PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" chroot "${TARGET_OUTPUT}" /bin/sh -c "/sbin/apk update ; /sbin/setup-timezone -z ${TARGET_TIMEZONE}"
-	#fi
 	if [ "${TARGET_ARCH}" = "armhf" ] || [ "${TARGET_ARCH}" = "aarch64" ]; then
 		QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "/sbin/apk update ; /sbin/setup-timezone -z ${TARGET_TIMEZONE}"
 	else
@@ -234,12 +224,6 @@ EOF
 		cp extra/${TARGET_QEMU} ${TARGET_OUTPUT}/usr/bin/
 	fi
 
-	#if [ "${TARGET_ARCH}" = "armhf" -a ! -e /proc/sys/fs/binfmt_misc/arm ] || [ "${TARGET_ARCH}" = "aarch64" -a ! -e /proc/sys/fs/binfmt_misc/aarch64 ]; then
-	#	pacstrap -C ${PACMAN_CONF} -c -d -G -M "${TARGET_OUTPUT}" filesystem pacman shadow grep
-	#	QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve -0 /bin/sh /bin/sh -c "/usr/bin/pacman -Suy --noconfirm ${PACMAN_BASE_PKGS} ${PACMAN_EXTRA_PKGS}"
-	#else
-	#	pacstrap -C ${PACMAN_CONF} -c -d -G -M "${TARGET_OUTPUT}" ${PACMAN_BASE_PKGS} ${PACMAN_EXTRA_PKGS}
-	#fi
 	if [ "${TARGET_ARCH}" = "armhf" ] || [ "${TARGET_ARCH}" = "aarch64" ]; then
 		pacstrap -C ${PACMAN_CONF} -c -d -G -M "${TARGET_OUTPUT}" filesystem pacman shadow grep
 		QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "/usr/bin/pacman -Suy --noconfirm ${PACMAN_BASE_PKGS} ${PACMAN_EXTRA_PKGS}"
@@ -259,11 +243,6 @@ EOF
 
 	#systemd-sysusers
 	if [ -e "${TARGET_OUTPUT}/usr/bin/systemd-sysusers" ]; then
-		#if [ "${TARGET_ARCH}" = "armhf" -a ! -e /proc/sys/fs/binfmt_misc/arm ] || [ "${TARGET_ARCH}" = "aarch64" -a ! -e /proc/sys/fs/binfmt_misc/aarch64 ]; then
-		#	QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve -0 /bin/sh /bin/sh -c "/usr/bin/systemd-sysusers"
-		#else
-		#	PATH="/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /bin/sh -c "/usr/bin/systemd-sysusers"
-		#fi
 		if [ "${TARGET_ARCH}" = "armhf" ] || [ "${TARGET_ARCH}" = "aarch64" ]; then
 			QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "/usr/bin/systemd-sysusers"
 		else
@@ -272,11 +251,6 @@ EOF
 	fi
 
 	#keyring
-	#if [ "${TARGET_ARCH}" = "armhf" -a ! -e /proc/sys/fs/binfmt_misc/arm ] || [ "${TARGET_ARCH}" = "aarch64" -a ! -e /proc/sys/fs/binfmt_misc/aarch64 ]; then
-	#	QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve -0 /bin/sh /bin/sh -c "/usr/bin/haveged ; /usr/bin/rm -fr /etc/pacman.d/gnupg ; /usr/bin/pacman-key --init ; /usr/bin/pacman-key --populate ${ARCH_KEYRING} ; /usr/bin/pkill haveged ; /usr/bin/pkill gpg-agent"
-	#else
-	#	PATH="/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /bin/sh -c "/usr/bin/haveged ; /usr/bin/rm -fr /etc/pacman.d/gnupg ; /usr/bin/pacman-key --init ; /usr/bin/pacman-key --populate ${ARCH_KEYRING} ; /usr/bin/pkill haveged ; /usr/bin/pkill gpg-agent"
-	#fi
 	if [ "${TARGET_ARCH}" = "armhf" ] || [ "${TARGET_ARCH}" = "aarch64" ]; then
 		QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "/usr/bin/haveged ; /usr/bin/rm -fr /etc/pacman.d/gnupg ; /usr/bin/pacman-key --init ; /usr/bin/pacman-key --populate ${ARCH_KEYRING} ; /usr/bin/pkill haveged ; /usr/bin/pkill gpg-agent"
 	else
@@ -291,19 +265,12 @@ EOF
 	#locale
 	sed -i "s/#en_US.UTF-8/en_US.UTF-8/g" ${TARGET_OUTPUT}/etc/locale.gen
 	sed -i "s/#${TARGET_LOCALE}/${TARGET_LOCALE}/g" ${TARGET_OUTPUT}/etc/locale.gen
-	#if [ "${TARGET_ARCH}" = "armhf" -a ! -e /proc/sys/fs/binfmt_misc/arm ] || [ "${TARGET_ARCH}" = "aarch64" -a ! -e /proc/sys/fs/binfmt_misc/aarch64 ]; then
-	#	QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve -0 /bin/sh /bin/sh -c "locale-gen"
-	#else
-	#	PATH="/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /bin/sh -c "/usr/bin/locale-gen"
-	#fi
+	rm -rf ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8
+	gzip -dk ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8.gz
 	if [ "${TARGET_ARCH}" = "armhf" ] || [ "${TARGET_ARCH}" = "aarch64" ]; then
 		QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "locale-gen"
 	else
 		PATH="/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /bin/sh -c "/usr/bin/locale-gen"
-	fi
-	#chroot ${TARGET_OUTPUT} locale-gen
-	if [ ! -e ${TARGET_OUTPUT}/usr/lib/locale/locale-archive ]; then
-		cp extra/locale-archive ${TARGET_OUTPUT}/usr/lib/locale/
 	fi
 	echo "LANG=${TARGET_LOCALE}" >> ${TARGET_OUTPUT}/etc/locale.conf
 	echo "LC_ALL=${TARGET_LOCALE}" >> ${TARGET_OUTPUT}/etc/locale.conf
@@ -320,11 +287,6 @@ EOF
 	if [ -e extra/package-query-*-${ARCH_ARCH}.pkg.tar.xz -a -e extra/yaourt-*-any.pkg.tar.xz ]; then
 		cp extra/package-query-*-${ARCH_ARCH}.pkg.tar.xz ${TARGET_OUTPUT}/
 		cp extra/yaourt-*-any.pkg.tar.xz ${TARGET_OUTPUT}/
-		#if [ "${TARGET_ARCH}" = "armhf" -a ! -e /proc/sys/fs/binfmt_misc/arm ] || [ "${TARGET_ARCH}" = "aarch64" -a ! -e /proc/sys/fs/binfmt_misc/aarch64 ]; then
-		#	QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve -0 /bin/sh /bin/sh -c "/usr/bin/pacman -Sy --noconfirm ; /usr/bin/pacman -U --noconfirm --asdeps /package-query-*; /usr/bin/pacman -U --noconfirm /yaourt-*-any.pkg.tar.xz"
-		#else
-		#	PATH="/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /bin/sh -c "/usr/bin/pacman -Sy --noconfirm ; /usr/bin/pacman -U --noconfirm --asdeps /package-query-*; /usr/bin/pacman -U --noconfirm /yaourt-*-any.pkg.tar.xz"
-		#fi
 		if [ "${TARGET_ARCH}" = "armhf" ] || [ "${TARGET_ARCH}" = "aarch64" ]; then
 			QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "/usr/bin/pacman -Sy --noconfirm ; /usr/bin/pacman -U --noconfirm --asdeps /package-query-*; /usr/bin/pacman -U --noconfirm /yaourt-*-any.pkg.tar.xz"
 		else
@@ -338,11 +300,6 @@ EOF
 	echo "Clearing"
 
 	if [ ! -z "${PACMAN_REMOVE_PKGS}" ]; then
-		#if [ "${TARGET_ARCH}" = "armhf" -a ! -e /proc/sys/fs/binfmt_misc/arm ] || [ "${TARGET_ARCH}" = "aarch64" -a ! -e /proc/sys/fs/binfmt_misc/aarch64 ]; then
-		#	QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve -0 /bin/sh /bin/sh -c "/usr/bin/pacman -Rsn --noconfirm ${PACMAN_REMOVE_PKGS}"
-		#else
-		#	PATH="/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /bin/sh -c /usr/bin/"pacman -Rsn --noconfirm ${PACMAN_REMOVE_PKGS}"
-		#fi
 		if [ "${TARGET_ARCH}" = "armhf" ] || [ "${TARGET_ARCH}" = "aarch64" ]; then
 			QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "/usr/bin/pacman -Rsn --noconfirm ${PACMAN_REMOVE_PKGS}"
 		else
@@ -427,11 +384,6 @@ fn_make_debian_common() {
 		PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true debootstrap --foreign ${DEBIAN_OPTION[@]} ${DEBIAN_DIST} "${TARGET_OUTPUT}" ${DEBIAN_MIRROR}
 
 		echo "debootstrap 2nd"
-		#if [ "${TARGET_ARCH}" = "armhf" -a ! -e /proc/sys/fs/binfmt_misc/arm ] || [ "${TARGET_ARCH}" = "aarch64" -a ! -e /proc/sys/fs/binfmt_misc/aarch64 ]; then
-		#	QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve -0 /bin/sh /bin/sh -c "/debootstrap/debootstrap --second-stage"
-		#else
-		#	PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true chroot "${TARGET_OUTPUT}" /bin/sh -c "/debootstrap/debootstrap --second-stage"
-		#fi
 		if [ "${TARGET_ARCH}" = "armhf" ] || [ "${TARGET_ARCH}" = "aarch64" ]; then
 			QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "/debootstrap/debootstrap --second-stage"
 		else
@@ -439,11 +391,6 @@ fn_make_debian_common() {
 		fi
 
 		echo "debootstrap 3rd"
-		#if [ "${TARGET_ARCH}" = "armhf" -a ! -e /proc/sys/fs/binfmt_misc/arm ] || [ "${TARGET_ARCH}" = "aarch64" -a ! -e /proc/sys/fs/binfmt_misc/aarch64 ]; then
-		#	QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve -0 /bin/sh /bin/sh -c "/usr/bin/dpkg --configure -a"
-		#else
-		#	PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true chroot "${TARGET_OUTPUT}" /bin/sh -c "/usr/bin/dpkg --configure -a"
-		#fi
 		if [ "${TARGET_ARCH}" = "armhf" ] || [ "${TARGET_ARCH}" = "aarch64" ]; then
 			QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "/usr/bin/dpkg --configure -a"
 		else
@@ -463,18 +410,12 @@ EOF
 	#locale
 	sed -i "s/# en_US.UTF-8/en_US.UTF-8/g" ${TARGET_OUTPUT}/etc/locale.gen
 	sed -i "s/# ${TARGET_LOCALE}/${TARGET_LOCALE}/g" ${TARGET_OUTPUT}/etc/locale.gen
-	#if [ "${TARGET_ARCH}" = "armhf" -a ! -e /proc/sys/fs/binfmt_misc/arm ] || [ "${TARGET_ARCH}" = "aarch64" -a ! -e /proc/sys/fs/binfmt_misc/aarch64 ]; then
-	#	QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve -0 /bin/sh /bin/sh -c "/usr/sbin/locale-gen"
-	#else
-	#	PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C chroot "${TARGET_OUTPUT}" /bin/sh -c "/usr/sbin/locale-gen"
-	#fi
+	rm -rf ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8
+	gzip -dk ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8.gz
 	if [ "${TARGET_ARCH}" = "armhf" ] || [ "${TARGET_ARCH}" = "aarch64" ]; then
 		QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "/usr/sbin/locale-gen"
 	else
 		PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C chroot "${TARGET_OUTPUT}" /bin/sh -c "/usr/sbin/locale-gen"
-	fi
-	if [ ! -e ${TARGET_OUTPUT}/usr/lib/locale/locale-archive ]; then
-		cp extra/locale-archive ${TARGET_OUTPUT}/usr/lib/locale/
 	fi
 	echo "LANG=${TARGET_LOCALE}" >> ${TARGET_OUTPUT}/etc/default/locale
 	echo "LANGUAGE=${TARGET_LOCALE}" >> ${TARGET_OUTPUT}/etc/default/locale
@@ -549,7 +490,6 @@ EOF
 		EOF
 	fi
 
-	#PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LC_ALL=C DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true chroot "${TARGET_OUTPUT}" /bin/sh -c "apt-get -o Acquire::Languages=none -o Acquire::GzipIndexes=true -o Acquire::CompressionTypes::Order::=gz -o APT::Install-Recommends=0 -o APT::Install-Suggests=0 -o APT::Get::Assume-Yes=true -o APT::Get::allow-downgrades=true -o APT::Get::allow-remove-essential=true -o APT::Get::allow-change-held-packages=true update ; apt-get -o Acquire::Languages=none -o Acquire::GzipIndexes=true -o Acquire::CompressionTypes::Order::=gz -o APT::Install-Recommends=0 -o APT::Install-Suggests=0 -o APT::Get::Assume-Yes=true -o APT::Get::allow-downgrades=true -o APT::Get::allow-remove-essential=true -o APT::Get::allow-change-held-packages=true dist-upgrade -y ; apt-get -o Acquire::Languages=none -o Acquire::GzipIndexes=true -o Acquire::CompressionTypes::Order::=gz -o APT::Install-Recommends=0 -o APT::Install-Suggests=0 -o APT::Get::Assume-Yes=true -o APT::Get::allow-downgrades=true -o APT::Get::allow-remove-essential=true -o APT::Get::allow-change-held-packages=true install apt-utils -y ; apt-get autoremove --purge -y ; apt-get autoclean -y ; apt-get clean ; find /var/lib/apt -type f -exec rm \"{}\" \\;"
 	if strings "${TARGET_OUTPUT}/usr/bin/dpkg" | grep -q unsafe-io; then
 		# force dpkg not to call sync() after package extraction (speeding up installs)
 		cat > "${TARGET_OUTPUT}/etc/dpkg/dpkg.cfg.d/docker-apt-speedup" <<-'EOF'
@@ -616,15 +556,15 @@ EOF
 		cp -f extra/${TARGET_QEMU} "${TARGET_OUTPUT}/usr/bin/"
 	fi
 
+	rm -rf ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8
+	gzip -dk ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8.gz
+
 	#docker-install
 	if [ -e "${TARGET_OUTPUT}/etc/arch-release" ]; then
 		cp -f extra/docker-install.arch ${TARGET_OUTPUT}/usr/local/bin/docker-install
 		rm -rf ${TARGET_OUTPUT}/usr/local/bin/docker-sysusers ${TARGET_OUTPUT}/usr/local/bin/docker-tmpfiles
 		#cp extra/docker-sysusers ${TARGET_OUTPUT}/usr/local/bin/
 		#cp extra/docker-tmpfiles ${TARGET_OUTPUT}/usr/local/bin/
-		if [ ! -e "${TARGET_OUTPUT}/usr/lib/locale/locale-archive" ]; then
-			cp extra/locale-archive ${TARGET_OUTPUT}/usr/lib/locale/
-		fi
 	elif [ -e "${TARGET_OUTPUT}/etc/os-release" -a ! -z "$(grep "ID=\(debian\|ubuntu\)" "${TARGET_OUTPUT}/etc/os-release")" ]; then
 		cp -f extra/docker-install.deb ${TARGET_OUTPUT}/usr/local/bin/docker-install
 	elif [ -e "${TARGET_OUTPUT}/etc/alpine-release" ]; then
@@ -639,24 +579,24 @@ EOF
 		ln -sf docker-build-arm "${TARGET_OUTPUT}/usr/local/bin/docker-build-start"
 		ln -sf docker-build-arm "${TARGET_OUTPUT}/usr/local/bin/docker-build-end"
 		rm -rf ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check
+		rm -rf ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check.sh
 		#if [ -e ${TARGET_OUTPUT}/lib/ld-musl-armhf.so.1 ]; then
 		#	cp extra/docker-execve-check.armv7h.musl ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check
 		#else
 		#	cp extra/docker-execve-check.armv7h.glibc ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check
 		#fi
-		rm -rf ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check.sh
 		#cp extra/docker-execve-check.sh ${TARGET_OUTPUT}/usr/local/bin/
 	elif [ "${TARGET_ARCH}" = "aarch64" ]; then
 		cp -f extra/docker-build-aarch64 "${TARGET_OUTPUT}/usr/local/bin/"
 		ln -sf docker-build-aarch64 "${TARGET_OUTPUT}/usr/local/bin/docker-build-start"
 		ln -sf docker-build-aarch64 "${TARGET_OUTPUT}/usr/local/bin/docker-build-end"
 		rm -rf ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check
+		rm -rf ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check.sh
 		#if [ -e ${TARGET_OUTPUT}/lib/ld-musl-aarch64.so.1 ]; then
 		#	cp extra/docker-execve-check.aarch64.musl ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check
 		#else
 		#	cp extra/docker-execve-check.aarch64.glibc ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check
 		#fi
-		rm -rf ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check.sh
 		#cp extra/docker-execve-check.sh ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check.sh
 	else
 		cp -f extra/docker-build-x64 "${TARGET_OUTPUT}/usr/local/bin/docker-build"
@@ -665,16 +605,6 @@ EOF
 		rm -rf ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check
 		#cp extra/docker-execve-check.sh ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check
 	fi
-
-	#gosu
-	rm -rf ${TARGET_OUTPUT}/usr/local/bin/gosu
-	#if [ "${TARGET_ARCH}" = "armhf" ]; then
-	#	cp extra/gosu-armhf ${TARGET_OUTPUT}/usr/local/bin/gosu
-	#elif [ "${TARGET_ARCH}" = "aarch64" ]; then
-	#	cp extra/gosu-arm64 ${TARGET_OUTPUT}/usr/local/bin/gosu
-	#else
-	#	cp extra/gosu-amd64 ${TARGET_OUTPUT}/usr/local/bin/gosu
-	#fi
 
 	#su-exec
 	#rm -rf ${TARGET_OUTPUT}/usr/local/bin/su-exec
@@ -698,6 +628,9 @@ EOF
 		fi
 	fi
 
+	rm -rf ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8
+	gzip -dk ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8.gz
+
 	#update
 	prev_md5=
 	post_md5=
@@ -718,11 +651,6 @@ EOF
 			PATH_CHROOT=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 		fi
 		
-		#if [ "${TARGET_ARCH}" = "armhf" -a ! -e /proc/sys/fs/binfmt_misc/arm ] || [ "${TARGET_ARCH}" = "aarch64" -a ! -e /proc/sys/fs/binfmt_misc/aarch64 ]; then
-		#	QEMU_EXECVE=1 PATH="${PATH_CHROOT}" LANG=C LC_ALL=C ${CHROOT_CMD} "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve -0 /bin/sh /bin/sh -c "docker-install -r -u -c"
-		#else
-		#	PATH="${PATH_CHROOT}" LANG=C LC_ALL=C ${CHROOT_CMD} "${TARGET_OUTPUT}" /bin/sh -c "docker-install -r -u -c"
-		#fi
 		if [ "${TARGET_ARCH}" = "armhf" ] || [ "${TARGET_ARCH}" = "aarch64" ]; then
 			QEMU_EXECVE=1 PATH="${PATH_CHROOT}" LANG=C LC_ALL=C ${CHROOT_CMD} "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "docker-install -r -u -c"
 		else
