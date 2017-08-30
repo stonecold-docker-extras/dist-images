@@ -250,6 +250,13 @@ EOF
 		fi
 	fi
 
+	#update-ca-trust
+	if [ "${TARGET_ARCH}" = "armhf" ] || [ "${TARGET_ARCH}" = "aarch64" ]; then
+		QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "update-ca-trust"
+	else
+		PATH="/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /bin/sh -c "update-ca-trust"
+	fi
+
 	#keyring
 	if [ "${TARGET_ARCH}" = "armhf" ] || [ "${TARGET_ARCH}" = "aarch64" ]; then
 		QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "/usr/bin/haveged ; /usr/bin/rm -fr /etc/pacman.d/gnupg ; /usr/bin/pacman-key --init ; /usr/bin/pacman-key --populate ${ARCH_KEYRING} ; /usr/bin/pkill haveged ; /usr/bin/pkill gpg-agent"
@@ -265,8 +272,12 @@ EOF
 	#locale
 	sed -i "s/#en_US.UTF-8/en_US.UTF-8/g" ${TARGET_OUTPUT}/etc/locale.gen
 	sed -i "s/#${TARGET_LOCALE}/${TARGET_LOCALE}/g" ${TARGET_OUTPUT}/etc/locale.gen
-	rm -rf ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8
-	gzip -dk ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8.gz
+	if [ -e ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8 ]; then
+		rm -rf ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8
+	fi
+	if [ -e ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8.gz ]; then
+		gzip -dk ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8.gz
+	fi
 	if [ "${TARGET_ARCH}" = "armhf" ] || [ "${TARGET_ARCH}" = "aarch64" ]; then
 		QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "locale-gen"
 	else
@@ -410,8 +421,12 @@ EOF
 	#locale
 	sed -i "s/# en_US.UTF-8/en_US.UTF-8/g" ${TARGET_OUTPUT}/etc/locale.gen
 	sed -i "s/# ${TARGET_LOCALE}/${TARGET_LOCALE}/g" ${TARGET_OUTPUT}/etc/locale.gen
-	rm -rf ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8
-	gzip -dk ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8.gz
+	if [ -e ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8 ]; then
+		rm -rf ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8
+	fi
+	if [ -e ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8.gz ]; then
+		gzip -dk ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8.gz
+	fi
 	if [ "${TARGET_ARCH}" = "armhf" ] || [ "${TARGET_ARCH}" = "aarch64" ]; then
 		QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "/usr/sbin/locale-gen"
 	else
@@ -556,8 +571,12 @@ EOF
 		cp -f extra/${TARGET_QEMU} "${TARGET_OUTPUT}/usr/bin/"
 	fi
 
-	rm -rf ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8
-	gzip -dk ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8.gz
+	if [ -e ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8 ]; then
+		rm -rf ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8
+	fi
+	if [ -e ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8.gz ]; then
+		gzip -dk ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8.gz
+	fi
 
 	#docker-install
 	if [ -e "${TARGET_OUTPUT}/etc/arch-release" ]; then
@@ -606,6 +625,12 @@ EOF
 		#cp extra/docker-execve-check.sh ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check
 	fi
 
+	#docker-adduser
+	cp -f extra/docker-adduser ${TARGET_OUTPUT}/usr/local/bin/docker-adduser
+
+	#docker-chown
+	cp -f extra/docker-chown ${TARGET_OUTPUT}/usr/local/bin/docker-chown
+
 	#su-exec
 	#rm -rf ${TARGET_OUTPUT}/usr/local/bin/su-exec
 	if [ "${TARGET_ARCH}" = "armhf" ]; then
@@ -628,8 +653,12 @@ EOF
 		fi
 	fi
 
-	rm -rf ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8
-	gzip -dk ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8.gz
+	if [ -e ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8 ]; then
+		rm -rf ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8
+	fi
+	if [ -e ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8.gz ]; then
+		gzip -dk ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8.gz
+	fi
 
 	#update
 	prev_md5=
@@ -655,6 +684,15 @@ EOF
 			QEMU_EXECVE=1 PATH="${PATH_CHROOT}" LANG=C LC_ALL=C ${CHROOT_CMD} "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "docker-install -r -u -c"
 		else
 			PATH="${PATH_CHROOT}" LANG=C LC_ALL=C ${CHROOT_CMD} "${TARGET_OUTPUT}" /bin/sh -c "docker-install -r -u -c"
+		fi
+
+		#update-ca-trust
+		if [ -e "${TARGET_OUTPUT}/etc/arch-release" ]; then
+			if [ "${TARGET_ARCH}" = "armhf" ] || [ "${TARGET_ARCH}" = "aarch64" ]; then
+				QEMU_EXECVE=1 PATH="${PATH_CHROOT}" LANG=C LC_ALL=C ${CHROOT_CMD} "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "update-ca-trust"
+			else
+				PATH="${PATH_CHROOT}" LANG=C LC_ALL=C ${CHROOT_CMD} "${TARGET_OUTPUT}" /bin/sh -c "update-ca-trust"
+			fi
 		fi
 
 		if [ -e "${TARGET_OUTPUT}/etc/arch-release" ]; then
@@ -820,6 +858,9 @@ else
 fi
 TARGET_IMPORT=${TARGET_IMPORT:-N}
 TARGET_PUSH=${TARGET_PUSH:-N}
+if [ "${TARGET_PUSH}" ]; then
+	TARGET_IMPORT=Y
+fi
 if [ "${TARGET_ARCH}" = "armhf" ]; then
 	TARGET_QEMU=qemu-arm-static
 elif [ "${TARGET_ARCH}" = "aarch64" ]; then
@@ -894,6 +935,13 @@ fi
 #prepare
 fn_target_unmount
 
+#Check arch linux
+if [ "${TARGET_DISTRO}" = "arch" -a "${TARGET_MAKE}" != "Y" ]; then
+	if [ -z "$(ls ${TARGET_OUTPUT}/etc/ca-certificates/extracted)" ]; then
+		TARGET_MAKE=Y
+	fi
+fi
+
 #Make
 if [ "${TARGET_MAKE}" = "Y" ]; then
 	if [ -e /etc/arch-release ]; then
@@ -929,20 +977,21 @@ if [ "${TARGET_UPDATE}" = "Y" ]; then
 	fi
 fi
 
+#clean
+rm -rf ${TARGET_OUTPUT}/qemu_*.core
+
+#dockerenv
+if [ -e /.dockerenv ]; then
+	exit
+fi
+
 #Import
-if [ "${TARGET_IMPORT}" = "Y" ]; then
+if [ ! -e /.dockerenv -a "${TARGET_IMPORT}" = "Y" ]; then
 	fn_import
 fi
 
 #Push
-if [ "${TARGET_PUSH}" = "Y" ]; then
+if [ ! -e /.dockerenv -a "${TARGET_PUSH}" = "Y" ]; then
 	fn_push
-fi
-
-#clean
-rm -rf ${TARGET_OUTPUT}/qemu_*.core
-
-if [ -e /.dockerenv ]; then
-	exit
 fi
 

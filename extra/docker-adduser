@@ -1,0 +1,114 @@
+#!/bin/sh
+
+fn_usage() {
+	echo "Usage : $(basename "${0}") [options] [USER_NAME]"
+	echo ""
+	echo "Options"
+	echo "  -u : UID"
+	echo "  -g : GID"
+	echo "  -G : groups"
+	echo "  -S : Shell"
+	echo "  -H : Home"
+	echo "  -R : System account"
+	exit 1
+}
+
+USER_NAME=
+USER_GROUP=
+USER_UID=
+USER_GID=
+USER_GROUPS=
+USER_SHELL=
+USER_HOME=
+SYSTEM_ACCOUNT=
+VERBOSE=
+
+while [ ${#} -ne 0 ]
+do
+	case "${1}" in
+		-h) fn_usage ;;
+		-u) USER_UID=${2} ; shift 1 ;;
+		-g) USER_GID=${2} ; shift 1 ;;
+		-G) USER_GROUPS=${2} ; shift 1 ;;
+		-S) USER_SHELL=${2} ; shift 1 ;;
+		-H) USER_HOME=${2} ; shift 1 ;;
+		-R) SYSTEM_ACCOUNT=Y ;;
+		-v) VERBOSE=Y ;;
+		*) USER_NAME=${1} ;;
+	esac
+	shift 1
+done
+
+USER_NAME="${USER_NAME:-forumi0721}"
+USER_UID="${USER_UID:-1000}"
+USER_GID="${USER_GID:-100}"
+USER_HOME="${USER_HOME:-/home/${USER_NAME}}"
+SYSTEM_ACCOUNT="${SYSTEM_ACCOUNT:-N}"
+VERBOSE="${VERBOSE:-N}"
+
+if [ -z $(getent group ${USER_GID}) ]; then
+	if [ -x /usr/sbin/addgroup -o -x /sbin/addgroup ]; then
+		addgroup -g ${USER_GID} $([ "${SYSTEM_ACCOUNT}" = "Y" ] && echo "-S") ${USER_NAME}
+	fi
+	if [ -x /usr/sbin/groupadd -o -x /sbin/groupadd ]; then
+		groupadd -g ${USER_GID} $([ "${SYSTEM_ACCOUNT}" = "Y" ] && echo "-r") ${USER_NAME}
+	fi
+fi
+USER_GROUP="$(getent group ${USER_GID} | cut -d ':' -f 1)"
+
+if [ -z "${USER_SHELL}" ]; then
+	if [ -e /bin/bash ]; then
+		USER_SHELL=/bin/bash
+	elif [ -e /bin/zsh ]; then
+		USER_SHELL=/bin/zsh
+	else
+		USER_SHELL=/bin/sh
+	fi
+fi
+
+if [ "${VERBOSE}" = "Y" ]; then
+	echo "USER_NAME : ${USER_NAME}"
+	echo "USER_GROUP : ${USER_GROUP}"
+	echo "USER_UID : ${USER_UID}"
+	echo "USER_GID : ${USER_GID}"
+	echo "USER_GROUPS : ${USER_GROUPS}"
+	echo "USER_SHELL : ${USER_SHELL}"
+	echo "USER_HOME : ${USER_HOME}"
+	echo "SYSTEM_ACCOUNT : ${SYSTEM_ACCOUNT}"
+fi
+
+if [ -x /usr/sbin/useradd -o -x /sbin/useradd ]; then
+	useradd -c ${USER_NAME} -g ${USER_GROUP} -s ${USER_SHELL} -u ${USER_UID} $([ ! -z "${USER_HOME}" ] && echo "-d ${USER_HOME}") $([ -e "${USER_HOME}" ] && echo "-M" || echo "-m") $([ "${SYSTEM_ACCOUNT}" = "Y" ] && echo "-r") ${USER_NAME}
+	if [ ! -z "${USER_GROUPS}" ]; then
+		IFS=,
+		for group in ${USER_GROUPS}
+		do
+			if [ ! -z "$(getent group ${group})" -a -z "$(id -Gn ${USER_NAME} | grep -w -o ${group})" ]; then
+				usermod -a -G ${group} ${USER_NAME}
+			fi
+		done
+		unset IFS
+	fi
+elif [ -x /usr/sbin/adduser -o -x /sbin/adduser ]; then
+	adduser -h ${USER_HOME} -G ${USER_GROUP} -s ${USER_SHELL} -D -u ${USER_UID} $([ ! -e "${USER_HOME}" ] && echo "-H") $([ "${SYSTEM_ACCOUNT}" = "Y" ] && echo "-S") ${USER_NAME}
+	delgroup ${USER_NAME} ${USER_GROUP}
+	if [ ! -z "${USER_GROUPS}" ]; then
+		IFS=,
+		for group in ${USER_GROUPS}
+		do
+			if [ ! -z "$(getent group ${group})" -a -z "$(id -Gn ${USER_NAME} | grep -w -o ${group})" ]; then
+				adduser ${USER_NAME} ${group}
+			fi
+		done
+		unset IFS
+	fi
+fi
+
+if [ "$(ls -land ${USER_HOME} 2> /dev/null | sed -e 's/^[^ ]\+[ ]\+[^ ]\+[ ]\+\([^ ]\+\)[ ]\+\([^ ]\+\)[ ]\+.*$/\1:\2/g')" != "$(id -u ${USER_NAME}):$(id -g ${USER_NAME})" ]; then
+	chown -R $(id -un ${USER_NAME}):$(id -gn ${USER_NAME}) ${USER_HOME}
+fi
+
+if [ "${VERBOSE}" = "Y" ]; then
+	id ${USER_NAME}
+fi
+
