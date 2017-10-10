@@ -46,6 +46,10 @@ USER_HOME="${USER_HOME:-/home/${USER_NAME}}"
 SYSTEM_ACCOUNT="${SYSTEM_ACCOUNT:-N}"
 VERBOSE="${VERBOSE:-N}"
 
+if [ "${USER_UID}" = "0" ]; then
+	exit 0
+fi
+
 if [ -z $(getent group ${USER_GID}) ]; then
 	if [ -x /usr/sbin/addgroup -o -x /sbin/addgroup ]; then
 		addgroup -g ${USER_GID} $([ "${SYSTEM_ACCOUNT}" = "Y" ] && echo "-S") ${USER_NAME}

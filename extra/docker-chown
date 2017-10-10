@@ -13,7 +13,7 @@ if [ -z "${USER_NAME}" -o -z "${TARGET}" -o -z "$(getent passwd ${USER_NAME})" -
 	exit 1
 fi
 
-if [ "$(ls -land ${TARGET} 2> /dev/null | sed -e 's/^[^ ]\+[ ]\+[^ ]\+[ ]\+\([^ ]\+\)[ ]\+\([^ ]\+\)[ ]\+.*$/\1:\2/g')" != "$(id -u ${USER_NAME}):$(id -g ${USER_NAME})" ]; then
-	chown -R $(id -un ${USER_NAME}):$(id -gn ${USER_NAME}) ${TARGET}
+if [ "$(ls -land "${TARGET}" 2> /dev/null | sed -e 's/^[^ ]\+[ ]\+[^ ]\+[ ]\+\([^ ]\+\)[ ]\+\([^ ]\+\)[ ]\+.*$/\1:\2/g')" != "$(id -u ${USER_NAME}):$(id -g ${USER_NAME})" ]; then
+	chown -R $(id -un ${USER_NAME}):$(id -gn ${USER_NAME}) "${TARGET}"
 fi
 
