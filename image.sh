@@ -43,7 +43,7 @@ fn_run_docker() {
 	fi
 
 	[ "${DEBUG}" = "Y" ] && set -x
-	docker run  $([ "${VERBOSE}" = "Y" ] && echo "-i -t") --rm --sig-proxy=false --privileged -e RUN_USER_NAME=${user} -e RUN_USER_UID=${uid} -e RUN_USER_GID=${gid} -e LANG=${lang} -e LC_ALL=${lc_all} -v ${workdir}:${dockerdir} -v ${workscript}:/usr/local/bin/docker-run-alt -v ${workdir}/extra/qemu-arm-static:/usr/bin/qemu-arm-static -v ${workdir}/extra/qemu-aarch64-static:/usr/bin/qemu-aarch64-static -h ${dockername} --name ${dockername} -e DOCKER_WORKDIR=${dockerdir} forumi0721archx64/arch-x64-dev:latest - "${@}"
+	docker run  --rm --sig-proxy=false --privileged -e RUN_USER_NAME=${user} -e RUN_USER_UID=${uid} -e RUN_USER_GID=${gid} -e LANG=${lang} -e LC_ALL=${lc_all} -v ${workdir}:${dockerdir} -v ${workscript}:/usr/local/bin/docker-run-alt -v ${workdir}/extra/qemu-arm-static:/usr/bin/qemu-arm-static -v ${workdir}/extra/qemu-aarch64-static:/usr/bin/qemu-aarch64-static -h ${dockername} --name ${dockername} -e DOCKER_WORKDIR=${dockerdir} forumi0721archx64/arch-x64-dev:latest - "${@}"
 	[ "${DEBUG}" = "Y" ] && set +x
 }
 
