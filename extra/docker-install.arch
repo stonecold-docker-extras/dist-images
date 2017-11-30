@@ -44,7 +44,11 @@ fn_del() {
 fn_yaourt_start() {
 	sed -i 's/if (( EUID == 0 ))/if (( EUID == -1 ))/g' /usr/bin/makepkg || prev_makepkg_mod=N
 
-	pacman -S --noconfirm --quiet --needed --asdeps base-devel git
+	if [ "$(uname -m)" = "x86_64" ]; then
+		pacman -S --noconfirm --quiet --needed --asdeps base-devel multilib-devel git
+	else
+		pacman -S --noconfirm --quiet --needed --asdeps base-devel git
+	fi
 
 	local aur=
 	for aur in package-query yaourt
