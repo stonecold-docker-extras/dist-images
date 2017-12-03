@@ -13,7 +13,8 @@ fn_refresh() {
 
 fn_update() {
 	if [ "${USE_YAOURT}" = "Y" ]; then
-		yaourt -Sua --noconfirm ${@}
+		yaourt -Sua --noconfirm --m-arg "--skippgpcheck" ${@}
+
 	else
 		pacman -Su --noconfirm --quiet ${@}
 	fi
@@ -26,7 +27,7 @@ fn_install() {
 	#fi
 
 	if [ "${USE_YAOURT}" = "Y" ]; then
-		yaourt -S --noconfirm ${@}
+		yaourt -S --noconfirm --m-arg "--skippgpcheck" ${@}
 	else
 		pacman -S --noconfirm --quiet ${@}
 	fi
