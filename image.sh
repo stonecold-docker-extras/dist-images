@@ -351,7 +351,8 @@ fn_make_ubuntu() {
 	DEBIAN_DIST="${DEBIAN_DIST:-xenial}"
 	echo "Current version : ${DEBIAN_DIST}"
 	local DEBIAN_MIRROR=
-	local DEBIAN_EXTRA=
+	#local DEBIAN_EXTRA="language-pack-ko"
+	local DEBIAN_EXTRA="locales,tzdata"
 
 	local DEBIAN_ARCH=${TARGET_ARCH}
 	DEBIAN_ARCH=${DEBIAN_ARCH/x64/amd64}
