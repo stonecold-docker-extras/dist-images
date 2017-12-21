@@ -51,10 +51,10 @@ fn_usage() {
 	echo "Usage : $(basename "${0}") [-d distro] [-a architecture] [-o output] [-l locale] [-z timezone] [--include include packages] [--exclud exclude pacakges] [-m] [-s] [-i] [-p] [-q]"
 	echo "          [-d distro] : arch,alpine,debian,ubuntu (default : arch)"
 	echo "          [-a architecture] : x64(x86_64),armv7h(armhf),aarch64(arm64) (default : x64)"
+	echo "          [-e edition] : debian, ubuntu option"
 	echo "          [-o output] : output dir (default : distro_archtecture)"
 	echo "          [-l locale] : locale (default : ko_KR.UTF-8)"
 	echo "          [-z timezone] : timezone (default : Asia/Seoul)"
-	echo "          [-k] : import docker (default : false)"
 	echo "          [--include include pacakges] : include pacakges (default : null)"
 	echo "          [--exclude exclude pacakges] : exclude pacakges (default : null)"
 	echo "          [-m] : make image"
@@ -330,9 +330,11 @@ EOF
 }
 
 fn_make_debian() {
-	local DEBIAN_DIST=jessie
-	DEBIAN_DIST="$(curl -sSL http://ftp.kaist.ac.kr/debian/dists/README | grep '^stable,' | sed -e 's/^stable, or \([^ ]\+\)\s\+.*$/\1/g')"
-	DEBIAN_DIST="${DEBIAN_DIST:-stretch}"
+	local DEBIAN_DIST=${TARGET_EDITION}
+	if [ -z "${DEBIAN_DIST}" ]; then
+		DEBIAN_DIST="$(curl -sSL http://ftp.kaist.ac.kr/debian/dists/README | grep '^stable,' | sed -e 's/^stable, or \([^ ]\+\)\s\+.*$/\1/g')"
+		DEBIAN_DIST="${DEBIAN_DIST:-stretch}"
+	fi
 	echo "Current version : ${DEBIAN_DIST}"
 	local DEBIAN_MIRROR=http://ftp.kr.debian.org/debian
 	local DEBIAN_EXTRA=locales
@@ -346,9 +348,11 @@ fn_make_debian() {
 }
 
 fn_make_ubuntu() {
-	local DEBIAN_DIST=xenial
-	DEBIAN_DIST="$(curl -sSL http://ftp.kaist.ac.kr/ubuntu/dists/ | grep -v 'backports' | grep -v 'proposed' | grep -v 'security' | grep -v 'updates' | grep '<tr><td class="n">' | tail -1  | sed -e 's/^<tr><td class="n"><a href="\(.*\)\/">.*$/\1/g')"
-	DEBIAN_DIST="${DEBIAN_DIST:-xenial}"
+	local DEBIAN_DIST=${TARGET_EDITION}
+	if [ -z "${DEBIAN_DIST}" ]; then
+		DEBIAN_DIST="$(curl -sSL http://ftp.kaist.ac.kr/ubuntu/dists/ | grep -v 'backports' | grep -v 'proposed' | grep -v 'security' | grep -v 'updates' | grep '<tr><td class="n">' | tail -1  | sed -e 's/^<tr><td class="n"><a href="\(.*\)\/">.*$/\1/g')"
+		DEBIAN_DIST="${DEBIAN_DIST:-zesty}"
+	fi
 	echo "Current version : ${DEBIAN_DIST}"
 	local DEBIAN_MIRROR=
 	#local DEBIAN_EXTRA="language-pack-ko"
@@ -732,11 +736,11 @@ EOF
 fn_import() {
 	echo "Import image"
 
-	for id in $(docker ps -a -q -f ancestor=${TARGET_NAME})
+	for id in $(docker ps -a -q -f ancestor=${TARGET_NAME}:${TARGET_TAG})
 	do
 		docker rm -f ${id}
 	done
-	for id in $(docker images -a -q ${TARGET_NAME})
+	for id in $(docker images -a -q ${TARGET_NAME}:${TAGET_TAG})
 	do
 		docker rmi -f ${id}
 	done
@@ -750,15 +754,15 @@ fn_import() {
 		shell=/bin/sh
 	fi
 	if [ "${TARGET_ARCH}" != "x64" -a "${TARGET_ARCH}" != "x86" ] ; then
-		cmd="tar --numeric-owner --xattrs --acls -C ${TARGET_OUTPUT} -c . | docker import --change \"ENTRYPOINT ${shell}\" --change \"ENV QEMU_EXECVE=1\" - ${TARGET_NAME}:latest"
+		cmd="tar --numeric-owner --xattrs --acls -C ${TARGET_OUTPUT} -c . | docker import --change \"ENTRYPOINT ${shell}\" --change \"ENV QEMU_EXECVE=1\" - ${TARGET_NAME}:${TARGET_TAG}"
 	else
-		cmd="tar --numeric-owner --xattrs --acls -C ${TARGET_OUTPUT} -c . | docker import --change \"ENTRYPOINT ${shell}\" - ${TARGET_NAME}:latest"
+		cmd="tar --numeric-owner --xattrs --acls -C ${TARGET_OUTPUT} -c . | docker import --change \"ENTRYPOINT ${shell}\" - ${TARGET_NAME}:${TARGET_TAG}"
 	fi
 	echo
 	if [ "${DEBUG}" = "Y" ]; then
 		echo "COMMAND : ${cmd}"
 	fi
-	eval ${cmd} &> /dev/null
+	eval ${cmd} #&> /dev/null
 	echo Success.
 	echo
 }
@@ -766,7 +770,7 @@ fn_import() {
 fn_push() {
 	echo "Push image"
 
-	docker push ${TARGET_NAME}:latest
+	docker push ${TARGET_NAME}:${TARGET_TAG}
 }
 
 if [ "$(uname -m)" != "x86_64" ]; then
@@ -782,11 +786,14 @@ DEBUG=N
 
 TARGET_DISTRO=
 TARGET_ARCH=
+TARGET_EDITION=
 TARGET_OUTPUT=
 TARGET_LOCALE=
 TARGET_TIMEZONE=
 TARGET_NAME=
+TARGET_TAG=
 TARGET_MAKE=
+TARGET_MAKE_ONLY=
 TARGET_UPDATE=
 TARGET_IMPORT=
 TARGET_PUSH=
@@ -805,15 +812,17 @@ do
 	case "${1}" in
 		-d|--distro) TARGET_DISTRO="${2}" ; shift 1 ;;
 		-a|--arch|--archtecture) TARGET_ARCH="${2}" ; shift 1 ;;
+		-e|--edition) TARGET_EDITION="${2}" ; shift 1 ;;
 		-o|--out|--output) TARGET_OUTPUT="${2}" ; shift 1 ;;
 		-l|--locale) TARGET_LOCALE="${2}" ; shift 1 ;;
 		-z|--timezone) TARGET_TIMEZONE="${2}" ; shift 1 ;;
 		--include) INCLUDE_PACKAGES="${2}" ; shift 1 ;;
 		--exclude) EXCLUDE_PACKAGES="${2}" ; shift 1 ;;
-		-n|--name) TARGET_NAME="${2}" ; shift 1 ;;
+		-n|--name) TARGET_NAME="${2/:*/}" ; TARGET_TAG="${2/*:/}" ; shift 1 ;;
 		-u|--update) TARGET_UPDATE="Y" ;;
 		-i|--import) TARGET_IMPORT="Y" ;;
 		-m|--make) TARGET_MAKE="Y" ;;
+		-mo) TARGET_MAKE="Y" ; TARGET_MAKE_ONLY="Y" ;;
 		-p|--push) TARGET_PUSH="Y" ;;
 		-q|--quiet) QUIET="Y" ;;
 		-v|--verbose) VERBOSE="Y" ;;
@@ -847,19 +856,20 @@ fi
 TARGET_LOCALE=${TARGET_LOCALE:-ko_KR.UTF-8}
 TARGET_TIMEZONE=${TARGET_TIMEZONE:-Asia/Seoul}
 TARGET_NAME=${TARGET_NAME:-forumi0721/${TARGET_DISTRO}-${TARGET_ARCH}-base}
+TARGET_TAG=${TARGET_TAG:-latest}
 if [ -e "${TARGET_OUTPUT}" ]; then
 	TARGET_MAKE=${TARGET_MAKE:-N}
 else
 	TARGET_MAKE=Y
 fi
-if [ "${TARGET_MAKE}" = "Y" -a -z "${TARGET_UPDATE}" ]; then
+if [ "${TARGET_MAKE_ONLY}" != "Y" -a "${TARGET_MAKE}" = "Y" -a -z "${TARGET_UPDATE}" ]; then
 	TARGET_UPDATE=Y
 else
 	TARGET_UPDATE=${TARGET_UPDATE:-N}
 fi
 TARGET_IMPORT=${TARGET_IMPORT:-N}
 TARGET_PUSH=${TARGET_PUSH:-N}
-if [ "${TARGET_PUSH}" ]; then
+if [ "${TARGET_PUSH}" = "Y" ]; then
 	TARGET_IMPORT=Y
 fi
 if [ "${TARGET_ARCH}" = "armhf" ]; then
@@ -878,10 +888,14 @@ fi
 if [ "${DEBUG}" = "Y" -o "${VERBOSE}" = "Y" ]; then
 	echo "TARGET_DISTRO=${TARGET_DISTRO}"
 	echo "TARGET_ARCH=${TARGET_ARCH}"
+	if [ ! -z "${TARGET_EDITION}" ]; then
+		echo "TARGET_EDITION=${TARGET_EDITION}"
+	fi
 	echo "TARGET_OUTPUT=${TARGET_OUTPUT}"
 	echo "TARGET_LOCALE=${TARGET_LOCALE}"
 	echo "TARGET_TIMEZONE=${TARGET_TIMEZONE}"
 	echo "TARGET_NAME=${TARGET_NAME}"
+	echo "TARGET_TAG=${TARGET_TAG}"
 	echo "TARGET_MAKE=${TARGET_MAKE}"
 	echo "TARGET_UPDATE=${TARGET_UPDATE}"
 	echo "TARGET_IMPORT=${TARGET_IMPORT}"
@@ -957,7 +971,7 @@ if [ "${TARGET_MAKE}" = "Y" ]; then
 			exit 1
 		else
 			tgt="$(echo "${TARGET_OUTPUT}" | sed -e "s#$(realpath "$(pwd)")#/build#g")"
-			fn_run_docker -d "${TARGET_DISTRO}" -a "${TARGET_ARCH}" -o "${tgt}" -l "${TARGET_LOCALE}" -z "${TARGET_TIMEZONE}" $([ ! -z "${INCLUDE_PACKAGES}" ] && echo "--include \"${INCLUDE_PACKAGES}\"") $([ ! -z "${EXCLUDE_PACKAGES}" ] && echo "--exclude \"${EXCLUDE_PACKAGES}\"") -n "${TARGET_NAME}" -m -u -q ${EXTRA_ARGS[*]}
+			fn_run_docker -d "${TARGET_DISTRO}" -a "${TARGET_ARCH}" $([ ! -z "${TARGET_EDITION}" ] && echo "-e ${TARGET_EDITION}") -o "${tgt}" -l "${TARGET_LOCALE}" -z "${TARGET_TIMEZONE}" $([ ! -z "${INCLUDE_PACKAGES}" ] && echo "--include \"${INCLUDE_PACKAGES}\"") $([ ! -z "${EXCLUDE_PACKAGES}" ] && echo "--exclude \"${EXCLUDE_PACKAGES}\"") -n "${TARGET_NAME}:${TARGET_TAG}" -m -u -q ${EXTRA_ARGS[*]}
 			TARGET_UPDATE=N
 		fi
 	fi
@@ -973,7 +987,7 @@ if [ "${TARGET_UPDATE}" = "Y" ]; then
 			exit 1
 		else
 			tgt="$(echo "${TARGET_OUTPUT}" | sed -e "s#$(realpath "$(pwd)")#/build#g")"
-			fn_run_docker -d "${TARGET_DISTRO}" -a "${TARGET_ARCH}" -o "${tgt}" -l "${TARGET_LOCALE}" -z "${TARGET_TIMEZONE}" $([ ! -z "${INCLUDE_PACKAGES}" ] && echo "--include \"${INCLUDE_PACKAGES}\"") $([ ! -z "${EXCLUDE_PACKAGES}" ] && echo "--exlcude \"${EXCLUDE_PACKAGES}\"") -n "${TARGET_NAME}" -u -q ${EXTRA_ARGS[*]}
+			fn_run_docker -d "${TARGET_DISTRO}" -a "${TARGET_ARCH}" $([ ! -z "${TARGET_EDITION}" ] && echo "-e ${TARGET_EDITION}") -o "${tgt}" -l "${TARGET_LOCALE}" -z "${TARGET_TIMEZONE}" $([ ! -z "${INCLUDE_PACKAGES}" ] && echo "--include \"${INCLUDE_PACKAGES}\"") $([ ! -z "${EXCLUDE_PACKAGES}" ] && echo "--exlcude \"${EXCLUDE_PACKAGES}\"") -n "${TARGET_NAME}:${TARGET_TAG}" -u -q ${EXTRA_ARGS[*]}
 		fi
 	fi
 fi
