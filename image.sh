@@ -179,7 +179,7 @@ fn_make_arch() {
 
 	if [ "${ARCH_ARCH}" = "armv7h" -o "${ARCH_ARCH}" = "aarch64" ]; then
 		#PACMAN_MIRRORLIST='Server = http://mirror.archlinuxarm.org/$arch/$repo'
-		PACMAN_MIRRORLIST='Server = http://sg.mirror.archlinuxarm.org/$arch/$repo'
+		PACMAN_MIRRORLIST='Server = http://tw.mirror.archlinuxarm.org/$arch/$repo'
 		PACMAN_EXTRA_PKGS="archlinuxarm-keyring"
 		ARCH_KEYRING="archlinuxarm"
 	else
@@ -350,8 +350,9 @@ fn_make_debian() {
 fn_make_ubuntu() {
 	local DEBIAN_DIST=${TARGET_EDITION}
 	if [ -z "${DEBIAN_DIST}" ]; then
-		DEBIAN_DIST="$(curl -sSL http://ftp.kaist.ac.kr/ubuntu/dists/ | grep -v 'backports' | grep -v 'proposed' | grep -v 'security' | grep -v 'updates' | grep '<tr><td class="n">' | tail -1  | sed -e 's/^<tr><td class="n"><a href="\(.*\)\/">.*$/\1/g')"
-		DEBIAN_DIST="${DEBIAN_DIST:-zesty}"
+		#DEBIAN_DIST="$(curl -sSL http://ftp.kaist.ac.kr/ubuntu/dists/ | grep -v 'backports' | grep -v 'proposed' | grep -v 'security' | grep -v 'updates' | grep '<tr><td class="n">' | tail -1  | sed -e 's/^<tr><td class="n"><a href="\(.*\)\/">.*$/\1/g')"
+		DEBIAN_DIST="artful"
+		DEBIAN_DIST="${DEBIAN_DIST:-xenial}"
 	fi
 	echo "Current version : ${DEBIAN_DIST}"
 	local DEBIAN_MIRROR=
@@ -850,7 +851,11 @@ if [ "${TARGET_ARCH}" != "x64" -a "${TARGET_ARCH}" != "armhf" -a "${TARGET_ARCH}
 	fn_usage
 fi
 if [ -z "${TARGET_OUTPUT}" ]; then
-	TARGET_OUTPUT=dist-${TARGET_DISTRO}-${TARGET_ARCH}
+	if [ ! -z "${TARGET_TAG}" ]; then
+		TARGET_OUTPUT=dist-${TARGET_DISTRO}-${TARGET_ARCH}-${TARGET_TAG}
+	else
+		TARGET_OUTPUT=dist-${TARGET_DISTRO}-${TARGET_ARCH}
+	fi
 	TARGET_OUTPUT=$(realpath ${TARGET_OUTPUT})
 fi
 TARGET_LOCALE=${TARGET_LOCALE:-ko_KR.UTF-8}
@@ -896,6 +901,7 @@ if [ "${DEBUG}" = "Y" -o "${VERBOSE}" = "Y" ]; then
 	echo "TARGET_TIMEZONE=${TARGET_TIMEZONE}"
 	echo "TARGET_NAME=${TARGET_NAME}"
 	echo "TARGET_TAG=${TARGET_TAG}"
+	echo "TARGET_OUTPUT=$(basename "${TARGET_OUTPUT}")"
 	echo "TARGET_MAKE=${TARGET_MAKE}"
 	echo "TARGET_UPDATE=${TARGET_UPDATE}"
 	echo "TARGET_IMPORT=${TARGET_IMPORT}"
@@ -997,6 +1003,7 @@ rm -rf ${TARGET_OUTPUT}/qemu_*.core
 
 #dockerenv
 if [ -e /.dockerenv ]; then
+	echo "Cannot execute in docker"
 	exit
 fi
 
