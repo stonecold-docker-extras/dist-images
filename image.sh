@@ -1003,7 +1003,9 @@ rm -rf ${TARGET_OUTPUT}/qemu_*.core
 
 #dockerenv
 if [ -e /.dockerenv ]; then
-	echo "Cannot execute in docker"
+	if [ "${TARGET_MAKE}" != "Y" -a "${TARGET_UPDATE}" != "Y" ]; then
+			echo "Cannot execute in docker"
+	fi
 	exit
 fi
 

@@ -9,5 +9,5 @@ do
 	done
 done
 
-./image.sh -d ubuntu -a x64 -n forumi0271/ubuntu-x64-base:xenial -u -q -v $@
+./image.sh -d ubuntu -a x64 -n forumi0721/ubuntu-x64-base:xenial -u -q -v $@
 
