@@ -9,4 +9,4 @@ do
 	done
 done
 
-./image.sh -d ubuntu -a x64 -n forumi0721/ubuntu-x64-base:xenial -m -q -v $@
+./image.sh -d ubuntu -a x64 -n forumi0721/ubuntu-x64-base:xenial -e xenial -m -q -v $@
