@@ -226,14 +226,21 @@ EOF
 
 	if [ "${TARGET_ARCH}" = "armhf" ] || [ "${TARGET_ARCH}" = "aarch64" ]; then
 		pacstrap -C ${PACMAN_CONF} -c -d -G -M "${TARGET_OUTPUT}" filesystem pacman shadow grep
+
 		QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "/usr/bin/pacman -Suy --noconfirm ${PACMAN_BASE_PKGS} ${PACMAN_EXTRA_PKGS}"
 	else
+		pacstrap -C ${PACMAN_CONF} -c -d -G -M "${TARGET_OUTPUT}" filesystem pacman shadow grep
+
 		pacstrap -C ${PACMAN_CONF} -c -d -G -M "${TARGET_OUTPUT}" ${PACMAN_BASE_PKGS} ${PACMAN_EXTRA_PKGS}
 	fi
 
 	echo
 
 	echo "Configuration"
+
+	#users gid
+	sed -i "s/^users:x:.*$/users:x:100:/g" ${TARGET_OUTPUT}/etc/group
+
 
 	#resolve
 	cat << EOF > ${TARGET_OUTPUT}/etc/resolv.conf
@@ -852,15 +859,27 @@ if [ "${TARGET_ARCH}" != "x64" -a "${TARGET_ARCH}" != "armhf" -a "${TARGET_ARCH}
 fi
 if [ -z "${TARGET_OUTPUT}" ]; then
 	if [ ! -z "${TARGET_TAG}" ]; then
-		TARGET_OUTPUT=dist-${TARGET_DISTRO}-${TARGET_ARCH}-${TARGET_TAG}
+		if [ -z "${TARGET_EDITION}" ]; then
+			TARGET_OUTPUT=dist-${TARGET_DISTRO}-${TARGET_ARCH}-${TARGET_TAG}
+		else
+			TARGET_OUTPUT=dist-${TARGET_DISTRO}-${TARGET_ARCH}-${TARGET_EDITION}-${TARGET_TAG}
+		fi
 	else
-		TARGET_OUTPUT=dist-${TARGET_DISTRO}-${TARGET_ARCH}
+		if [ -z "${TARGET_EDITION}" ]; then
+			TARGET_OUTPUT=dist-${TARGET_DISTRO}-${TARGET_ARCH}
+		else
+			TARGET_OUTPUT=dist-${TARGET_DISTRO}-${TARGET_ARCH}-${TARGET_EDITION}
+		fi
 	fi
 	TARGET_OUTPUT=$(realpath ${TARGET_OUTPUT})
 fi
 TARGET_LOCALE=${TARGET_LOCALE:-ko_KR.UTF-8}
 TARGET_TIMEZONE=${TARGET_TIMEZONE:-Asia/Seoul}
-TARGET_NAME=${TARGET_NAME:-forumi0721/${TARGET_DISTRO}-${TARGET_ARCH}-base}
+if [ -z "${TARGET_EDITION}" ]; then
+	TARGET_NAME=${TARGET_NAME:-forumi0721/${TARGET_DISTRO}-${TARGET_ARCH}-base}
+else
+	TARGET_NAME=${TARGET_NAME:-forumi0721/${TARGET_DISTRO}-${TARGET_ARCH}-base-${TARGET_EDITION}}
+fi
 TARGET_TAG=${TARGET_TAG:-latest}
 if [ -e "${TARGET_OUTPUT}" ]; then
 	TARGET_MAKE=${TARGET_MAKE:-N}
