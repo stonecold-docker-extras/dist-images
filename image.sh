@@ -343,7 +343,9 @@ fn_make_debian() {
 		DEBIAN_DIST="${DEBIAN_DIST:-stretch}"
 	fi
 	echo "Current version : ${DEBIAN_DIST}"
-	local DEBIAN_MIRROR=http://ftp.kr.debian.org/debian
+	#local DEBIAN_MIRROR=http://ftp.kr.debian.org/debian
+	#local DEBIAN_MIRROR=http://ftp.daumkakao.com/debian
+	local DEBIAN_MIRROR=http://ftp.lanet.kr/debian
 	local DEBIAN_EXTRA=locales
 
 	local DEBIAN_ARCH=${TARGET_ARCH}
@@ -374,7 +376,9 @@ fn_make_ubuntu() {
 	if [ "${DEBIAN_ARCH}" = "armhf" -o "${DEBIAN_ARCH}" = "arm64" ]; then
 		DEBIAN_MIRROR=http://ports.ubuntu.com/ubuntu-ports
 	else
-		DEBIAN_MIRROR=http://kr.archive.ubuntu.com/ubuntu
+		#DEBIAN_MIRROR=http://kr.archive.ubuntu.com/ubuntu
+		#DEBIAN_MIRROR=http://ftp.daumkakao.com/ubuntu
+		DEBIAN_MIRROR=http://ftp.lanet.kr/ubuntu
 	fi
 
 	fn_make_debian_common "${DEBIAN_DIST}" "${DEBIAN_MIRROR}" "${DEBIAN_EXTRA}" "${DEBIAN_ARCH}"
