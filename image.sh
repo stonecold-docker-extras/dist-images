@@ -87,9 +87,10 @@ fi
 fn_make_alpine() {
 	echo "Bootstrap"
 
-	local ALPINE_DIST=v3.6
-	ALPINE_DIST="$(curl -sSL http://dl-cdn.alpinelinux.org/alpine | grep '<a href="v' | tail -1 | sed -e 's/^<a href="\(.*\)\/">.*$/\1/g')"
-	ALPINE_DIST="${ALPINE_DIST:-v3.6}"
+	local ALPINE_DIST=wdge
+	#local ALPINE_DIST=v3.7
+	#ALPINE_DIST="$(curl -sSL http://dl-cdn.alpinelinux.org/alpine | grep '<a href="v' | tail -1 | sed -e 's/^<a href="\(.*\)\/">.*$/\1/g')"
+	#ALPINE_DIST="${ALPINE_DIST:-v3.7}"
 	echo "Current version : ${ALPINE_DIST}"
 	local ALPINE_MIRROR=http://dl-cdn.alpinelinux.org/alpine
 	#local ALPINE_MIRROR=http://dl-2.alpinelinux.org/alpine
