@@ -87,7 +87,7 @@ fi
 fn_make_alpine() {
 	echo "Bootstrap"
 
-	local ALPINE_DIST=wdge
+	local ALPINE_DIST=edge
 	#local ALPINE_DIST=v3.7
 	#ALPINE_DIST="$(curl -sSL http://dl-cdn.alpinelinux.org/alpine | grep '<a href="v' | tail -1 | sed -e 's/^<a href="\(.*\)\/">.*$/\1/g')"
 	#ALPINE_DIST="${ALPINE_DIST:-v3.7}"
@@ -123,8 +123,8 @@ fn_make_alpine() {
 
 	#resolve
 	cat << EOF > ${TARGET_OUTPUT}/etc/resolv.conf
-nameserver 8.8.8.8
-nameserver 8.8.4.4
+nameserver 1.1.1.1
+nameserver 1.0.0.1
 EOF
 
 	#timezone
@@ -245,8 +245,8 @@ EOF
 
 	#resolve
 	cat << EOF > ${TARGET_OUTPUT}/etc/resolv.conf
-nameserver 8.8.8.8
-nameserver 8.8.4.4
+nameserver 1.1.1.1
+nameserver 1.0.0.1
 EOF
 
 	#systemd-sysusers
@@ -432,8 +432,8 @@ fn_make_debian_common() {
 
 	#resolve
 	cat << EOF > ${TARGET_OUTPUT}/etc/resolv.conf
-nameserver 8.8.8.8
-nameserver 8.8.4.4
+nameserver 1.1.1.1
+nameserver 1.0.0.1
 EOF
 
 	#locale
@@ -577,8 +577,8 @@ fn_update() {
 	echo "Update"
 	#resolve
 	cat << EOF > ${TARGET_OUTPUT}/etc/resolv.conf
-nameserver 8.8.8.8
-nameserver 8.8.4.4
+nameserver 1.1.1.1
+nameserver 1.0.0.1
 EOF
 
 	#clear
@@ -602,6 +602,7 @@ EOF
 		rm -rf ${TARGET_OUTPUT}/usr/local/bin/docker-sysusers ${TARGET_OUTPUT}/usr/local/bin/docker-tmpfiles
 		#cp extra/docker-sysusers ${TARGET_OUTPUT}/usr/local/bin/
 		#cp extra/docker-tmpfiles ${TARGET_OUTPUT}/usr/local/bin/
+		mount -o bind ${TARGET_OUTPUT} ${TARGET_OUTPUT}
 	elif [ -e "${TARGET_OUTPUT}/etc/os-release" -a ! -z "$(grep "ID=\(debian\|ubuntu\)" "${TARGET_OUTPUT}/etc/os-release")" ]; then
 		cp -f extra/docker-install.deb ${TARGET_OUTPUT}/usr/local/bin/docker-install
 	elif [ -e "${TARGET_OUTPUT}/etc/alpine-release" ]; then
@@ -693,6 +694,7 @@ EOF
 		elif [ -e "${TARGET_OUTPUT}/etc/os-release" -a ! -z "$(grep "ID=\(debian\|ubuntu\)" "${TARGET_OUTPUT}/etc/os-release")" ]; then
 			prev_md5=$(tar -cf - ${TARGET_OUTPUT}/var/lib/dpkg/info 2> /dev/null | md5sum | cut -f 1 -d ' ')
 			PATH_CHROOT="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+			rm -rf ${TARGET_OUTPUT}/var/lib/apt/lists/lock
 		elif [ -e "${TARGET_OUTPUT}/etc/alpine-release" ]; then
 			prev_md5=$(md5sum ${TARGET_OUTPUT}/lib/apk/db/installed | cut -f 1 -d ' ')
 			PATH_CHROOT=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
@@ -739,6 +741,16 @@ EOF
 	if [ -e "${TARGET_OUTPUT}/etc/os-release"  ]; then
 		if [ ! -z "$(grep 'ID=\(debian\|ubuntu\)' "${TARGET_OUTPUT}/etc/os-release")" ]; then
 			find ${TARGET_OUTPUT}/var -name \*.log -o -name \*-old -exec rm -rf "{}" \;
+		fi
+	fi
+
+	#term
+	if [ -e "${TARGET_OUTPUT}/etc/arch-release" ]; then
+		if [ ! -z "$(find ${TARGET_OUTPUT}/usr/share/terminfo/ 2> /dev/null | grep '_ADMIN_')" ]; then
+			for t in ${TARGET_OUTPUT}/usr/share/terminfo/*_ADMIN_*
+			do
+				mv ${t} ${t/_ADMIN_*/}
+			done
 		fi
 	fi
 
@@ -845,6 +857,24 @@ do
 	shift
 done
 
+#create dist.img
+if [ ! -e dist ]; then
+	mkdir -p dist
+fi
+if [ ! -e dist.img ]; then
+	dd if=/dev/zero of=dist.img bs=1G count=10 skip=10
+	mkfs.ext4 dist.img
+	mount -o loop dist.img dist
+	touch dist/img
+elif [ ! -e dist/img ]; then
+	mount -o loop dist.img dist
+fi
+
+if [ ! -e dist/img ]; then
+	echo "Errof dist.img"
+	exit 1
+fi
+
 #set default
 #TARGET_DISTRO="${TARGET_DISTRO:-arch}"
 if [ "${TARGET_DISTRO}" != "alpine" -a "${TARGET_DISTRO}" != "arch" -a "${TARGET_DISTRO}" != "debian" -a "${TARGET_DISTRO}" != "ubuntu" ]; then
@@ -876,6 +906,7 @@ if [ -z "${TARGET_OUTPUT}" ]; then
 			TARGET_OUTPUT=dist-${TARGET_DISTRO}-${TARGET_ARCH}-${TARGET_EDITION}
 		fi
 	fi
+	TARGET_OUTPUT="dist/${TARGET_OUTPUT}"
 	TARGET_OUTPUT=$(realpath ${TARGET_OUTPUT})
 fi
 TARGET_LOCALE=${TARGET_LOCALE:-ko_KR.UTF-8}
@@ -1041,5 +1072,9 @@ fi
 #Push
 if [ ! -e /.dockerenv -a "${TARGET_PUSH}" = "Y" ]; then
 	fn_push
+fi
+
+if [ -e dist/img ]; then
+	umount dist
 fi
 

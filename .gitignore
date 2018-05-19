@@ -1,3 +1,5 @@
 dist-*
 OLD
 test.sh
+dist.img
+dist
