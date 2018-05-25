@@ -88,10 +88,10 @@ fn_make_alpine() {
 	echo "Bootstrap"
 
 	local ALPINE_DIST=edge
-	#local ALPINE_DIST=v3.7
-	#ALPINE_DIST="$(curl -sSL http://dl-cdn.alpinelinux.org/alpine | grep '<a href="v' | tail -1 | sed -e 's/^<a href="\(.*\)\/">.*$/\1/g')"
-	#ALPINE_DIST="${ALPINE_DIST:-v3.7}"
-	echo "Current version : ${ALPINE_DIST}"
+	local ALPINE_DIST_CURRENT=v3.7
+	ALPINE_DIST_CURRENT="$(curl -sSL http://dl-cdn.alpinelinux.org/alpine | grep '<a href="v' | tail -1 | sed -e 's/^<a href="\(.*\)\/">.*$/\1/g')"
+	ALPINE_DIST_CURRENT="${ALPINE_DIST_CURRENT:-v3.7}"
+	echo "Current version : ${ALPINE_DIST_CURRENT}"
 	local ALPINE_MIRROR=http://dl-cdn.alpinelinux.org/alpine
 	#local ALPINE_MIRROR=http://dl-2.alpinelinux.org/alpine
 
@@ -118,8 +118,13 @@ fn_make_alpine() {
 	echo "Configuration"
 
 	#mirror
+	if [ "${ALPINE_DIST_CURRENT}" != "${ALPINE_DIST}" ]; then
+		echo "${ALPINE_MIRROR}/${ALPINE_DIST_CURRENT}/main" > ${TARGET_OUTPUT}/etc/apk/repositories
+		echo "${ALPINE_MIRROR}/${ALPINE_DIST_CURRENT}/community" >> ${TARGET_OUTPUT}/etc/apk/repositories
+	fi
 	echo "${ALPINE_MIRROR}/${ALPINE_DIST}/main" > ${TARGET_OUTPUT}/etc/apk/repositories
 	echo "${ALPINE_MIRROR}/${ALPINE_DIST}/community" >> ${TARGET_OUTPUT}/etc/apk/repositories
+	echo "${ALPINE_MIRROR}/${ALPINE_DIST}/testing" >> ${TARGET_OUTPUT}/etc/apk/repositories
 
 	#resolve
 	cat << EOF > ${TARGET_OUTPUT}/etc/resolv.conf
