@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+
+if [ -e /.dockerenv ]; then
+	echo "Cannot run in docker"
+	exit 1
+fi
+
+screen -S "docker dist-images" -m \
+docker run -i -t --rm --sig-proxy=false --privileged \
+	-e RUN_USER_NAME=$(id -un) \
+	-e RUN_USER_UID=$(id -u) \
+	-e RUN_USER_GID=$(id -g) \
+	-e LANG=ko_KR.UTF-8 \
+	-e LC_ALL=ko_KR.UTF-8 \
+	-e USER_NAME=root \
+	-e SRC_DIR=/docker \
+	-e MOUNT_DIR=/docker/dist \
+	$([ -e `pwd`/docker/home ] && echo "-v `pwd`/docker/home:/home") \
+	$([ -e `pwd`/docker/root ] && echo "-v `pwd`/docker/root:/root") \
+	$([ -e `pwd`/docker/docker-run-pre ] && echo "-v `pwd`/docker/docker-run-pre:/usr/local/bin/docker-run-pre") \
+	-v `pwd`:/docker \
+	-w /docker \
+	-h arch-x64-dev-armbian \
+	--name arch-x64-dev \
+	forumi0721archx64/arch-x64-dev:latest

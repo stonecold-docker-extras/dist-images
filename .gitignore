@@ -3,3 +3,5 @@ OLD
 test.sh
 dist.img
 dist
+docker/home
+docker/root

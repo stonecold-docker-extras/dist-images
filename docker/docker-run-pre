@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+
+SRC_DIR=${SRC_DIR:-/docker}
+MOUNT_DIR=${MOUNT_DIR:-${SRC_DIR}/dist}
+RUN_USER_UID=${RUN_USER_UID:-0}
+RUN_USER_GID=${RUN_USER_GID:-0}
+
+if [ ! -e ${SRC_DIR} ]; then
+	mkdir -p ${SRC_DIR}
+fi
+if [ ! -e ${MOUNT_DIR} ]; then
+	mkdir -p ${MOUNT_DIR}
+fi
+
+if [ ! -e ${SRC_DIR}/dist.img ]; then
+	dd if=/dev/zero of=${SRC_DIR}/dist.img bs=1M count=0 seek=20480
+	mkfs.ext4 -F ${SRC_DIR}/dist.img
+fi
+mount -o loop ${SRC_DIR}/dist.img ${MOUNT_DIR}
+chown ${RUN_USER_UID}:${RUN_USER_GID} ${MOUNT_DIR}
+
+echo
+echo "dist-images mounted in ${MOUNT_DIR}"
+echo
+
