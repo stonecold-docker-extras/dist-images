@@ -677,6 +677,28 @@ EOF
 		fi
 	fi
 
+	#goreman
+	#rm -rf ${TARGET_OUTPUT}/usr/local/bin/goreman
+	if [ "${TARGET_ARCH}" = "armhf" ]; then
+		if [ -e ${TARGET_OUTPUT}/lib/ld-musl-armhf.so.1 ]; then
+			cp extra/goreman-musl-armv7h ${TARGET_OUTPUT}/usr/local/bin/goreman
+		else
+			cp extra/goreman-glibc-armv7h ${TARGET_OUTPUT}/usr/local/bin/goreman
+		fi
+	elif [ "${TARGET_ARCH}" = "aarch64" ]; then
+		if [ -e ${TARGET_OUTPUT}/lib/ld-musl-aarch64.so.1 ]; then
+			cp extra/goreman-musl-aarch64 ${TARGET_OUTPUT}/usr/local/bin/goreman
+		else
+			cp extra/goreman-glibc-aarch64 ${TARGET_OUTPUT}/usr/local/bin/goreman
+		fi
+	else
+		if [ -e ${TARGET_OUTPUT}/lib/ld-musl-x86_64.so.1 ]; then
+			cp extra/goreman-musl-x64 ${TARGET_OUTPUT}/usr/local/bin/goreman
+		else
+			cp extra/goreman-glibc-x64 ${TARGET_OUTPUT}/usr/local/bin/goreman
+		fi
+	fi
+
 	if [ -e ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8 ]; then
 		rm -rf ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8
 	fi
