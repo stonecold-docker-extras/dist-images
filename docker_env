@@ -20,6 +20,6 @@ docker run -i -t --rm --sig-proxy=false --privileged \
 	$([ -e `pwd`/docker/docker-run-pre ] && echo "-v `pwd`/docker/docker-run-pre:/usr/local/bin/docker-run-pre") \
 	-v `pwd`:/docker \
 	-w /docker \
-	-h arch-x64-dev-armbian \
+	-h arch-x64-dev-docker \
 	--name arch-x64-dev \
 	forumi0721archx64/arch-x64-dev:latest
