@@ -88,9 +88,9 @@ fn_make_alpine() {
 	echo "Bootstrap"
 
 	local ALPINE_DIST=edge
-	local ALPINE_DIST_CURRENT=v3.7
+	local ALPINE_DIST_CURRENT=v3.8
 	ALPINE_DIST_CURRENT="$(curl -sSL http://dl-cdn.alpinelinux.org/alpine | grep '<a href="v' | tail -1 | sed -e 's/^<a href="\(.*\)\/">.*$/\1/g')"
-	ALPINE_DIST_CURRENT="${ALPINE_DIST_CURRENT:-v3.7}"
+	ALPINE_DIST_CURRENT="${ALPINE_DIST_CURRENT:-v3.8}"
 	echo "Current version : ${ALPINE_DIST_CURRENT}"
 	local ALPINE_MIRROR=http://dl-cdn.alpinelinux.org/alpine
 	#local ALPINE_MIRROR=http://dl-2.alpinelinux.org/alpine
