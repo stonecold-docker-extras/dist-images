@@ -1,0 +1,29 @@
+#!/bin/sh
+
+set -e
+
+if [ -e /.init ]; then
+	exit
+fi
+
+touch /.init
+
+RUN_USER_NAME=${RUN_USER_NAME:-forumi0721}
+RUN_USER_GROUP=${RUN_USER_GROUP:-users,wheel,sudo,abuild}
+RUN_USER_UID=${RUN_USER_UID:-1000}
+RUN_USER_GID=${RUN_USER_GID:-100}
+RUN_USER_HOME=${RUN_USER_HOME:-/home/${RUN_USER_NAME}}
+if [ "${RUN_USER_NAME}" = "root" -o "${RUN_USER_UID}" = "0" ]; then
+	RUN_USER_NAME=root
+	RUN_USER_GROUP=root
+	RUN_USER_UID=0
+	RUN_USER_GID=0
+	RUN_USER_HOME=/root
+fi
+
+docker-adduser -u ${RUN_USER_UID} -g ${RUN_USER_GID} -G ${RUN_USER_GROUP} -H ${RUN_USER_HOME} ${RUN_USER_NAME}
+
+RUN_USER_HOME=$(eval echo ~${RUN_USER_NAME})
+
+docker-chown ${RUN_USER_NAME} ${RUN_USER_HOME}
+

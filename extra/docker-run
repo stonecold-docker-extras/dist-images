@@ -1,0 +1,36 @@
+#!/bin/sh
+
+set -e
+
+[ -x /usr/local/bin/docker-binfmt ] && /usr/local/bin/docker-binfmt
+
+[ -x /usr/local/bin/docker-run-pre ] && /usr/local/bin/docker-run-pre
+
+[ -x /usr/local/bin/docker-bootstrap ] && /usr/local/bin/docker-bootstrap
+
+if [ -x /usr/local/bin/docker-run-alt ]; then
+	exec /usr/local/bin/docker-run-alt "${@}"
+else
+	RUN_USER_NAME=${RUN_USER_NAME:-forumi0721}
+	RUN_USER_GROUP=${RUN_USER_GROUP:-users,wheel,sudo,abuild}
+	RUN_USER_UID=${RUN_USER_UID:-1000}
+	RUN_USER_GID=${RUN_USER_GID:-100}
+	RUN_USER_HOME=${RUN_USER_HOME:-/home/${RUN_USER_NAME}}
+	if [ "${RUN_USER_NAME}" = "root" -o "${RUN_USER_UID}" = "0" ]; then
+		RUN_USER_NAME=root
+		RUN_USER_GROUP=root
+		RUN_USER_UID=0
+		RUN_USER_GID=0
+		RUN_USER_HOME=/root
+	fi
+
+	docker-adduser -u ${RUN_USER_UID} -g ${RUN_USER_GID} -G ${RUN_USER_GROUP} -H ${RUN_USER_HOME} ${RUN_USER_NAME}
+
+	RUN_USER_HOME=$(eval echo ~${RUN_USER_NAME})
+
+	docker-chown ${RUN_USER_NAME} ${RUN_USER_HOME}
+
+	RUN_USER_SHELL=$(getent passwd ${RUN_USER_NAME} | cut -d ':' -f 7)
+	exec su-exec ${RUN_USER_NAME} ${RUN_USER_SHELL} --login
+fi
+

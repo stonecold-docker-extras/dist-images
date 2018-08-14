@@ -601,6 +601,9 @@ EOF
 		gzip -dk ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8.gz
 	fi
 
+	#docker-run
+	cp extra/docker-run ${TARGET_OUTPUT}/usr/local/bin/docker-run
+	
 	#docker-install
 	if [ -e "${TARGET_OUTPUT}/etc/arch-release" ]; then
 		cp -f extra/docker-install.arch ${TARGET_OUTPUT}/usr/local/bin/docker-install
@@ -806,9 +809,10 @@ fn_import() {
 		shell=/bin/sh
 	fi
 	if [ "${TARGET_ARCH}" != "x64" -a "${TARGET_ARCH}" != "x86" ] ; then
-		cmd="tar --numeric-owner --xattrs --acls -C ${TARGET_OUTPUT} -c . | docker import --change \"ENTRYPOINT ${shell}\" --change \"ENV QEMU_EXECVE=1\" - ${TARGET_NAME}:${TARGET_TAG}"
+		#cmd="tar --numeric-owner --xattrs --acls -C ${TARGET_OUTPUT} -c . | docker import --change \"ENTRYPOINT ${shell}\" --change \"ENV QEMU_EXECVE=1\" - ${TARGET_NAME}:${TARGET_TAG}"
+		cmd="tar --numeric-owner --xattrs --acls -C ${TARGET_OUTPUT} -c . | docker import --change \"ENTRYPOINT docker-run\" --change \"ENV QEMU_EXECVE=1\" - ${TARGET_NAME}:${TARGET_TAG}"
 	else
-		cmd="tar --numeric-owner --xattrs --acls -C ${TARGET_OUTPUT} -c . | docker import --change \"ENTRYPOINT ${shell}\" - ${TARGET_NAME}:${TARGET_TAG}"
+		cmd="tar --numeric-owner --xattrs --acls -C ${TARGET_OUTPUT} -c . | docker import --change \"ENTRYPOINT docker-run\" - ${TARGET_NAME}:${TARGET_TAG}"
 	fi
 	echo
 	if [ "${DEBUG}" = "Y" ]; then
