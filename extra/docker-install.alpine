@@ -27,6 +27,8 @@ fn_del() {
 
 fn_clean() {
 	rm -rf /qemu_sh_*.core /var/cache/apk/* /tmp/install.log /tmp/scripts
+	find  /root -mindepth 1 -maxdepth 1 -exec rm -rf "{}" \;
+	find  /tmp -mindepth 1 -maxdepth 1 -exec rm -rf "{}" \;
 }
 
 
