@@ -10,3 +10,5 @@ do
 done
 
 ./image.sh -d ubuntu -a x64 -e xenial -m -q -v $@
+#./image.sh -d ubuntu -a x64 -e artful -m -q -v $@
+

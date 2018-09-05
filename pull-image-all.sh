@@ -10,3 +10,5 @@ do
 done
 
 docker pull forumi0721/ubnutu-x64-base-xenial
+#docker pull forumi0721/ubnutu-x64-base-artful
+
