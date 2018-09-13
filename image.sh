@@ -22,11 +22,11 @@ echo_blue() {
 
 fn_run_docker() {
 	if ! docker info &> /dev/null ; then
-		echo "Cannot execute docker"
+		echo "Cannot execute docker (1)"
 		exit 1
 	fi
 
-	local dockername=arch-x64-dev-docker-${RANDOM}
+	local dockername=alpine-x64-dev-docker-dist-${RANDOM}
 	local dockerdir=/build
 	local workdir="$(pwd)"
 	local workscript="${workdir}/$(basename "${0}")"
@@ -43,7 +43,7 @@ fn_run_docker() {
 	fi
 
 	[ "${DEBUG}" = "Y" ] && set -x
-	docker run  --rm --sig-proxy=false --privileged -e RUN_USER_NAME=${user} -e RUN_USER_UID=${uid} -e RUN_USER_GID=${gid} -e LANG=${lang} -e LC_ALL=${lc_all} -v ${workdir}:${dockerdir} -v ${workscript}:/usr/local/bin/docker-run-alt -v ${workdir}/extra/qemu-arm-static:/usr/bin/qemu-arm-static -v ${workdir}/extra/qemu-aarch64-static:/usr/bin/qemu-aarch64-static -h ${dockername} --name ${dockername} -e DOCKER_WORKDIR=${dockerdir} forumi0721archx64/arch-x64-dev:latest - "${@}"
+	docker run  --rm --sig-proxy=false --privileged -e RUN_USER_NAME=${user} -e RUN_USER_UID=${uid} -e RUN_USER_GID=${gid} -e LANG=${lang} -e LC_ALL=${lc_all} -v ${workdir}:${dockerdir} -v ${workscript}:/usr/local/bin/docker-run-alt -v ${workdir}/extra/qemu-arm-static:/usr/bin/qemu-arm-static -v ${workdir}/extra/qemu-aarch64-static:/usr/bin/qemu-aarch64-static -h ${dockername} --name ${dockername} -e DOCKER_WORKDIR=${dockerdir} forumi0721alpinex64/alpine-x64-dev:latest - "${@}"
 	[ "${DEBUG}" = "Y" ] && set +x
 }
 
@@ -108,7 +108,11 @@ fn_make_alpine() {
 	local APK_VERSION="$(curl -sSL ${ALPINE_MIRROR}/${ALPINE_DIST}/main/${ALPINE_ARCH}/APKINDEX.tar.gz | tar -Oxz | grep --text '^P:apk-tools-static$' -A1 | tail -n1 | cut -d: -f2)"
 	curl -sSL ${ALPINE_MIRROR}/${ALPINE_DIST}/main/${ALPINE_ARCH}/apk-tools-static-${APK_VERSION}.apk | tar -xz -C "${TARGET_OUTPUT}" sbin/apk.static  2>/dev/null
 	if [ "${TARGET_ARCH}" = "armhf" ] || [ "${TARGET_ARCH}" = "aarch64" ]; then
-		QEMU_EXECVE=1 /usr/bin/${TARGET_QEMU} -execve ${TARGET_OUTPUT}/sbin/apk.static --repository ${ALPINE_MIRROR}/${ALPINE_DIST}/main --update-cache --allow-untrusted --root "${TARGET_OUTPUT}" --initdb add alpine-base
+		if [ -e /usr/bin/${TARGET_QEMU} ]; then
+			QEMU_EXECVE=1 /usr/bin/${TARGET_QEMU} -execve ${TARGET_OUTPUT}/sbin/apk.static --repository ${ALPINE_MIRROR}/${ALPINE_DIST}/main --update-cache --allow-untrusted --root "${TARGET_OUTPUT}" --initdb add alpine-base
+		else
+			QEMU_EXECVE=1 extra/${TARGET_QEMU} -execve ${TARGET_OUTPUT}/sbin/apk.static --repository ${ALPINE_MIRROR}/${ALPINE_DIST}/main --update-cache --allow-untrusted --root "${TARGET_OUTPUT}" --initdb add alpine-base
+		fi
 	else
 		${TARGET_OUTPUT}/sbin/apk.static --repository ${ALPINE_MIRROR}/${ALPINE_DIST}/main --update-cache --allow-untrusted --root "${TARGET_OUTPUT}" --initdb add alpine-base 
 	fi
@@ -233,7 +237,7 @@ EOF
 	if [ "${TARGET_ARCH}" = "armhf" ] || [ "${TARGET_ARCH}" = "aarch64" ]; then
 		pacstrap -C ${PACMAN_CONF} -c -d -G -M "${TARGET_OUTPUT}" filesystem pacman shadow grep
 
-		QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "/usr/bin/pacman -Suy --noconfirm ${PACMAN_BASE_PKGS} ${PACMAN_EXTRA_PKGS}"
+		QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "/usr/bin/pacman -Suy --noconfirm ${PACMAN_BASE_PKGS} ${PACMAN_EXTRA_PKGS}"
 	else
 		pacstrap -C ${PACMAN_CONF} -c -d -G -M "${TARGET_OUTPUT}" filesystem pacman shadow grep
 
@@ -257,24 +261,24 @@ EOF
 	#systemd-sysusers
 	if [ -e "${TARGET_OUTPUT}/usr/bin/systemd-sysusers" ]; then
 		if [ "${TARGET_ARCH}" = "armhf" ] || [ "${TARGET_ARCH}" = "aarch64" ]; then
-			QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "/usr/bin/systemd-sysusers"
+			QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "/usr/bin/systemd-sysusers"
 		else
-			PATH="/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /bin/sh -c "/usr/bin/systemd-sysusers"
+			PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /bin/sh -c "/usr/bin/systemd-sysusers"
 		fi
 	fi
 
 	#update-ca-trust
 	if [ "${TARGET_ARCH}" = "armhf" ] || [ "${TARGET_ARCH}" = "aarch64" ]; then
-		QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "update-ca-trust"
+		QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "update-ca-trust"
 	else
-		PATH="/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /bin/sh -c "update-ca-trust"
+		PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /bin/sh -c "update-ca-trust"
 	fi
 
 	#keyring
 	if [ "${TARGET_ARCH}" = "armhf" ] || [ "${TARGET_ARCH}" = "aarch64" ]; then
-		QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "/usr/bin/haveged ; /usr/bin/rm -fr /etc/pacman.d/gnupg ; /usr/bin/pacman-key --init ; /usr/bin/pacman-key --populate ${ARCH_KEYRING} ; /usr/bin/pkill haveged ; /usr/bin/pkill gpg-agent"
+		QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "/usr/bin/haveged ; /usr/bin/rm -fr /etc/pacman.d/gnupg ; /usr/bin/pacman-key --init ; /usr/bin/pacman-key --populate ${ARCH_KEYRING} ; /usr/bin/pkill haveged ; /usr/bin/pkill gpg-agent"
 	else
-		PATH="/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /bin/sh -c "/usr/bin/haveged ; /usr/bin/rm -fr /etc/pacman.d/gnupg ; /usr/bin/pacman-key --init ; /usr/bin/pacman-key --populate ${ARCH_KEYRING} ; /usr/bin/pkill haveged ; /usr/bin/pkill gpg-agent"
+		PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /bin/sh -c "/usr/bin/haveged ; /usr/bin/rm -fr /etc/pacman.d/gnupg ; /usr/bin/pacman-key --init ; /usr/bin/pacman-key --populate ${ARCH_KEYRING} ; /usr/bin/pkill haveged ; /usr/bin/pkill gpg-agent"
 	fi
 
 	#basic config
@@ -292,9 +296,9 @@ EOF
 		gzip -dk ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8.gz
 	fi
 	if [ "${TARGET_ARCH}" = "armhf" ] || [ "${TARGET_ARCH}" = "aarch64" ]; then
-		QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "locale-gen"
+		QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "locale-gen"
 	else
-		PATH="/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /bin/sh -c "/usr/bin/locale-gen"
+		PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /bin/sh -c "/usr/bin/locale-gen"
 	fi
 	echo "LANG=${TARGET_LOCALE}" >> ${TARGET_OUTPUT}/etc/locale.conf
 	echo "LC_ALL=${TARGET_LOCALE}" >> ${TARGET_OUTPUT}/etc/locale.conf
@@ -312,9 +316,9 @@ EOF
 		cp extra/package-query-*-${ARCH_ARCH}.pkg.tar.xz ${TARGET_OUTPUT}/
 		cp extra/yaourt-*-any.pkg.tar.xz ${TARGET_OUTPUT}/
 		if [ "${TARGET_ARCH}" = "armhf" ] || [ "${TARGET_ARCH}" = "aarch64" ]; then
-			QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "/usr/bin/pacman -Sy --noconfirm ; /usr/bin/pacman -U --noconfirm --asdeps /package-query-*; /usr/bin/pacman -U --noconfirm /yaourt-*-any.pkg.tar.xz"
+			QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "/usr/bin/pacman -Sy --noconfirm ; /usr/bin/pacman -U --noconfirm --asdeps /package-query-*; /usr/bin/pacman -U --noconfirm /yaourt-*-any.pkg.tar.xz"
 		else
-			PATH="/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /bin/sh -c "/usr/bin/pacman -Sy --noconfirm ; /usr/bin/pacman -U --noconfirm --asdeps /package-query-*; /usr/bin/pacman -U --noconfirm /yaourt-*-any.pkg.tar.xz"
+			PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /bin/sh -c "/usr/bin/pacman -Sy --noconfirm ; /usr/bin/pacman -U --noconfirm --asdeps /package-query-*; /usr/bin/pacman -U --noconfirm /yaourt-*-any.pkg.tar.xz"
 		fi
 		rm -rf ${TARGET_OUTPUT}/*.pkg.tar.xz
 	fi
@@ -325,9 +329,9 @@ EOF
 
 	if [ ! -z "${PACMAN_REMOVE_PKGS}" ]; then
 		if [ "${TARGET_ARCH}" = "armhf" ] || [ "${TARGET_ARCH}" = "aarch64" ]; then
-			QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "/usr/bin/pacman -Rsn --noconfirm ${PACMAN_REMOVE_PKGS}"
+			QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "/usr/bin/pacman -Rsn --noconfirm ${PACMAN_REMOVE_PKGS}"
 		else
-			PATH="/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /bin/sh -c /usr/bin/"pacman -Rsn --noconfirm ${PACMAN_REMOVE_PKGS}"
+			PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /bin/sh -c /usr/bin/"pacman -Rsn --noconfirm ${PACMAN_REMOVE_PKGS}"
 		fi
 	fi
 
@@ -716,7 +720,7 @@ EOF
 	if [ "${TARGET_UPDATE}" = "Y" ]; then
 		if [ -e "${TARGET_OUTPUT}/etc/arch-release" ]; then
 			prev_md5=$(tar -cf - ${TARGET_OUTPUT}/var/lib/pacman/local 2> /dev/null | md5sum | cut -f 1 -d ' ')
-			PATH_CHROOT="/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl"
+			PATH_CHROOT="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl"
 			if [ -e /usr/bin/arch-chroot ]; then
 				CHROOT_CMD=arch-chroot
 			fi
@@ -1050,7 +1054,7 @@ fi
 
 #Make
 if [ "${TARGET_MAKE}" = "Y" ]; then
-	if [ -e /etc/arch-release ]; then
+	if [ -e /etc/alpine-release ]; then
 		rm -rf "${TARGET_OUTPUT}" || (echo "Cannot remove ${TARGET_OUTPUT}" ; exit 1)
 		mkdir -p "${TARGET_OUTPUT}" || (echo "Cannot create ${TARGET_OUTPUT}" ; exit 1)
 		chmod 755 ${TARGET_OUTPUT}
@@ -1058,7 +1062,7 @@ if [ "${TARGET_MAKE}" = "Y" ]; then
 		eval fn_make_${TARGET_DISTRO}
 	else
 		if [ -e /.dockerenv ]; then
-			echo "Cannot execute in docker"
+			echo "Cannot execute in docker (2)"
 			exit 1
 		else
 			tgt="$(echo "${TARGET_OUTPUT}" | sed -e "s#$(realpath "$(pwd)")#/build#g")"
@@ -1070,11 +1074,11 @@ fi
 
 #Update
 if [ "${TARGET_UPDATE}" = "Y" ]; then
-	if [ -e /etc/arch-release ]; then
+	if [ -e /etc/alpine-release ]; then
 		eval fn_update
 	else
 		if [ -e /.dockerenv ]; then
-			echo "Cannot execute in docker"
+			echo "Cannot execute in docker (3)"
 			exit 1
 		else
 			tgt="$(echo "${TARGET_OUTPUT}" | sed -e "s#$(realpath "$(pwd)")#/build#g")"
@@ -1089,7 +1093,7 @@ rm -rf ${TARGET_OUTPUT}/qemu_*.core
 #dockerenv
 if [ -e /.dockerenv ]; then
 	if [ "${TARGET_MAKE}" != "Y" -a "${TARGET_UPDATE}" != "Y" ]; then
-			echo "Cannot execute in docker"
+		echo "Cannot exeucte in docker (4)"
 	fi
 	exit
 fi

@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
 
-for dist in alpine arch debian ubuntu
+for dist in arch debian ubuntu alpine
 do
 	for arch in x64 armhf aarch64
 	do
 		echo "${dist} ${arch}"
 		./image.sh -d "${dist}" -a "${arch}" -p -q -v $@
 	done
+	if [ "${dist}" = "ubuntu" ]; then
+		echo "${dist} x64-xenial"
+		./image.sh -d ubuntu -a x64 -e xenial -p -q -v $@
+	fi
 done
-
-./image.sh -d ubuntu -a x64 -e xenial -p -q -v $@
-#./image.sh -d ubuntu -a x64 -e artful -p -q -v $@
 

@@ -20,6 +20,8 @@ docker run -i -t --rm --sig-proxy=false --privileged \
 	$([ -e `pwd`/docker/docker-run-pre ] && echo "-v `pwd`/docker/docker-run-pre:/usr/local/bin/docker-run-pre") \
 	-v `pwd`:/docker \
 	-w /docker \
-	-h arch-x64-dev-docker \
-	--name arch-x64-dev \
-	forumi0721archx64/arch-x64-dev:latest
+	-v `pwd`/extra/qemu-arm-static:/usr/bin/qemu-arm-static \
+	-v `pwd`/extra/qemu-aarch64-static:/usr/bin/qemu-aarch64-static \
+	-h alpine-x64-dev-docker \
+	--name alpine-x64-dev-docker-${RANDOM} \
+	forumi0721alpinex64/alpine-x64-dev:latest
