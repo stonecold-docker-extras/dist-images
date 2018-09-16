@@ -87,7 +87,8 @@ fi
 fn_make_alpine() {
 	echo "Bootstrap"
 
-	local ALPINE_DIST=edge
+	#local ALPINE_DIST=edge
+	local ALPINE_DIST=v3.8
 	local ALPINE_DIST_CURRENT=v3.8
 	ALPINE_DIST_CURRENT="$(curl -sSL http://dl-cdn.alpinelinux.org/alpine | grep '<a href="v' | tail -1 | sed -e 's/^<a href="\(.*\)\/">.*$/\1/g')"
 	ALPINE_DIST_CURRENT="${ALPINE_DIST_CURRENT:-v3.8}"
@@ -107,14 +108,18 @@ fn_make_alpine() {
 	fi
 	local APK_VERSION="$(curl -sSL ${ALPINE_MIRROR}/${ALPINE_DIST}/main/${ALPINE_ARCH}/APKINDEX.tar.gz | tar -Oxz | grep --text '^P:apk-tools-static$' -A1 | tail -n1 | cut -d: -f2)"
 	curl -sSL ${ALPINE_MIRROR}/${ALPINE_DIST}/main/${ALPINE_ARCH}/apk-tools-static-${APK_VERSION}.apk | tar -xz -C "${TARGET_OUTPUT}" sbin/apk.static  2>/dev/null
-	if [ "${TARGET_ARCH}" = "armhf" ] || [ "${TARGET_ARCH}" = "aarch64" ]; then
-		if [ -e /usr/bin/${TARGET_QEMU} ]; then
-			QEMU_EXECVE=1 /usr/bin/${TARGET_QEMU} -execve ${TARGET_OUTPUT}/sbin/apk.static --repository ${ALPINE_MIRROR}/${ALPINE_DIST}/main --update-cache --allow-untrusted --root "${TARGET_OUTPUT}" --initdb add alpine-base
-		else
-			QEMU_EXECVE=1 extra/${TARGET_QEMU} -execve ${TARGET_OUTPUT}/sbin/apk.static --repository ${ALPINE_MIRROR}/${ALPINE_DIST}/main --update-cache --allow-untrusted --root "${TARGET_OUTPUT}" --initdb add alpine-base
-		fi
+	if [ ! -z "${TARGET_QEMU}" ]; then
+		QEMU_EXECVE=1 /usr/bin/${TARGET_QEMU} -execve ${TARGET_OUTPUT}/sbin/apk.static --repository ${ALPINE_MIRROR}/${ALPINE_DIST}/main --no-cache --no-script --allow-untrusted --root "${TARGET_OUTPUT}" --initdb add busybox alpine-baselayout alpine-keys apk-tools libc-utils
+		for link in $(QEMU_EXECVE=1 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin LANG=C LC_ALL=C chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "/bin/busybox --list-full"); do
+			[ -e "${TARGET_OUTPUT}"/$link ] || ln -s /bin/busybox "${TARGET_OUTPUT}"/$link
+		done
+		QEMU_EXECVE=1 /usr/bin/${TARGET_QEMU} -execve ${TARGET_OUTPUT}/sbin/apk.static --repository ${ALPINE_MIRROR}/${ALPINE_DIST}/main --no-cache --allow-untrusted --root "${TARGET_OUTPUT}" --stdout --quiet fetch alpine-base | tar -zx -C "${TARGET_OUTPUT}" etc/
 	else
-		${TARGET_OUTPUT}/sbin/apk.static --repository ${ALPINE_MIRROR}/${ALPINE_DIST}/main --update-cache --allow-untrusted --root "${TARGET_OUTPUT}" --initdb add alpine-base 
+		${TARGET_OUTPUT}/sbin/apk.static --repository ${ALPINE_MIRROR}/${ALPINE_DIST}/main --no-cache --no-script --allow-untrusted --root "${TARGET_OUTPUT}" --initdb add busybox alpine-baselayout alpine-keys apk-tools libc-utils
+		for link in $("${TARGET_OUTPUT}"/bin/busybox --list-full); do
+			[ -e "${TARGET_OUTPUT}"/$link ] || ln -s /bin/busybox "${TARGET_OUTPUT}"/$link
+		done
+		${TARGET_OUTPUT}/sbin/apk.static --repository ${ALPINE_MIRROR}/${ALPINE_DIST}/main --no-cache --allow-untrusted --root "${TARGET_OUTPUT}" --stdout --quiet fetch alpine-base | tar -zx -C "${TARGET_OUTPUT}" etc/
 	fi
 
 	echo
@@ -122,13 +127,16 @@ fn_make_alpine() {
 	echo "Configuration"
 
 	#mirror
-	if [ "${ALPINE_DIST_CURRENT}" != "${ALPINE_DIST}" ]; then
-		echo "${ALPINE_MIRROR}/${ALPINE_DIST_CURRENT}/main" > ${TARGET_OUTPUT}/etc/apk/repositories
-		echo "${ALPINE_MIRROR}/${ALPINE_DIST_CURRENT}/community" >> ${TARGET_OUTPUT}/etc/apk/repositories
+	echo "${ALPINE_MIRROR}/${ALPINE_DIST_CURRENT}/main" > ${TARGET_OUTPUT}/etc/apk/repositories
+	echo "${ALPINE_MIRROR}/${ALPINE_DIST_CURRENT}/community" >> ${TARGET_OUTPUT}/etc/apk/repositories
+	if [ "${ALPINE_DIST_CURRENT}" != "edge" ]; then
+		echo "Disable edge"
+		#echo "${ALPINE_MIRROR}/edge/main" >> ${TARGET_OUTPUT}/etc/apk/repositories
+		#echo "${ALPINE_MIRROR}/edge/community" >> ${TARGET_OUTPUT}/etc/apk/repositories
+		#echo "${ALPINE_MIRROR}/edge/testing" >> ${TARGET_OUTPUT}/etc/apk/repositories
+	else
+		echo "${ALPINE_MIRROR}/edge/testing" >> ${TARGET_OUTPUT}/etc/apk/repositories
 	fi
-	echo "${ALPINE_MIRROR}/${ALPINE_DIST}/main" > ${TARGET_OUTPUT}/etc/apk/repositories
-	echo "${ALPINE_MIRROR}/${ALPINE_DIST}/community" >> ${TARGET_OUTPUT}/etc/apk/repositories
-	echo "${ALPINE_MIRROR}/${ALPINE_DIST}/testing" >> ${TARGET_OUTPUT}/etc/apk/repositories
 
 	#resolve
 	cat << EOF > ${TARGET_OUTPUT}/etc/resolv.conf
@@ -138,11 +146,23 @@ EOF
 
 	#timezone
 	echo "${TARGET_TIMEZONE}" > ${TARGET_OUTPUT}/etc/TZ
-	if [ "${TARGET_ARCH}" = "armhf" ] || [ "${TARGET_ARCH}" = "aarch64" ]; then
-		QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "/sbin/apk update ; /sbin/setup-timezone -z ${TARGET_TIMEZONE}"
+	#if [ -e "${TARGET_OUTPUT}/usr/share/zoneinfo/${TARGET_TIMEZONE}" ]; then
+	#	ln -sf /usr/share/zoneinfo/${TARGET_TIMEZONE} ${TARGET_OUTPUT}/etc/localtime
+	#fi
+	local tz1=$(echo "${TARGET_TIMEZONE}" | cut -d '/' -f 1)
+	local tz2=$(echo "${TARGET_TIMEZONE}" | cut -d '/' -f 2)
+	mkdir -p ${TARGET_OUTPUT}/tmp/tzdata
+	if [ ! -z "${TARGET_QEMU}" ]; then
+		QEMU_EXECVE=1 /usr/bin/${TARGET_QEMU} -execve ${TARGET_OUTPUT}/sbin/apk.static --repository ${ALPINE_MIRROR}/${ALPINE_DIST}/main --no-cache --allow-untrusted --root "${TARGET_OUTPUT}" --stdout --quiet fetch tzdata | tar -zx -C "${TARGET_OUTPUT}/tmp/tzdata" usr/share/zoneinfo
 	else
-		PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" chroot "${TARGET_OUTPUT}" /bin/sh -c "/sbin/apk update ; /sbin/setup-timezone -z ${TARGET_TIMEZONE}"
+		${TARGET_OUTPUT}/sbin/apk.static --repository ${ALPINE_MIRROR}/${ALPINE_DIST}/main --no-cache --allow-untrusted --root "${TARGET_OUTPUT}" --stdout --quiet fetch tzdata | tar -zx -C "${TARGET_OUTPUT}/tmp/tzdata" usr/share/zoneinfo
 	fi
+	if [ -e ${TARGET_OUTPUT}/tmp/tzdata/usr/share/zoneinfo/${tz1}/${tz2} ]; then
+		mkdir -p ${TARGET_OUTPUT}/etc/zoneinfo/${tz1}
+		cp ${TARGET_OUTPUT}/tmp/tzdata/usr/share/zoneinfo/${tz1}/${tz2} ${TARGET_OUTPUT}/etc/zoneinfo/${tz1}/${tz2}
+		ln -sf /etc/zoneinfo/${tz1}/${tz2} ${TARGET_OUTPUT}/etc/localtime
+	fi
+	rm -rf ${TARGET_OUTPUT}/tmp/tzdata
 
 	echo
 
@@ -151,6 +171,7 @@ EOF
 
 	rm -rf ${TARGET_OUTPUT}/sbin/apk.static
 	rm -rf ${TARGET_OUTPUT}/var/cache/apk/*
+	rm -rf ${TARGET_OUTPUT}/tmp/*
 
 	echo
 
@@ -712,6 +733,16 @@ EOF
 		gzip -dk ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8.gz
 	fi
 
+	#archlinux term fix
+	if [ -e "${TARGET_OUTPUT}/etc/arch-release" ]; then
+		if [ ! -z "$(find ${TARGET_OUTPUT}/usr/share/terminfo/ 2> /dev/null | grep '_ADMIN_')" ]; then
+			for t in ${TARGET_OUTPUT}/usr/share/terminfo/*_ADMIN_*
+			do
+				mv ${t} ${t/_ADMIN_*/}
+			done
+		fi
+	fi
+
 	#update
 	prev_md5=
 	post_md5=
@@ -739,14 +770,24 @@ EOF
 			PATH="${PATH_CHROOT}" LANG=C LC_ALL=C ${CHROOT_CMD} "${TARGET_OUTPUT}" /bin/sh -c "docker-install -r -u -c"
 		fi
 
-		#update-ca-trust
+		#archlinux update-ca-trust
 		if [ -e "${TARGET_OUTPUT}/etc/arch-release" ]; then
-			if [ "${TARGET_ARCH}" = "armhf" ] || [ "${TARGET_ARCH}" = "aarch64" ]; then
+			if [ ! -z "${TARGET_QEMU}" ]; then
 				QEMU_EXECVE=1 PATH="${PATH_CHROOT}" LANG=C LC_ALL=C ${CHROOT_CMD} "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "update-ca-trust"
 			else
 				PATH="${PATH_CHROOT}" LANG=C LC_ALL=C ${CHROOT_CMD} "${TARGET_OUTPUT}" /bin/sh -c "update-ca-trust"
 			fi
 		fi
+
+		#alpinelinux update baselayout
+		if [ -e "${TARGET_OUTPUT}/etc/alpine-release" ]; then
+			if [ ! -z "${TARGET_QEMU}" ]; then
+				QEMU_EXECVE=1 PATH="${PATH_CHROOT}" LANG=C LC_ALL=C ${CHROOT_CMD} "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "apk --no-cache --allow-untrusted --stdout --quiet fetch alpine-base | tar -zx -C / etc/"
+			else
+				PATH="${PATH_CHROOT}" LANG=C LC_ALL=C ${CHROOT_CMD} "${TARGET_OUTPUT}" /bin/sh -c "apk --no-cache --allow-untrusted --stdout --quiet fetch alpine-base | tar -zx -C / etc/"
+			fi
+		fi
+
 
 		if [ -e "${TARGET_OUTPUT}/etc/arch-release" ]; then
 			post_md5=$(tar -cf - ${TARGET_OUTPUT}/var/lib/pacman/local 2> /dev/null | md5sum | cut -f 1 -d ' ')
@@ -771,23 +812,14 @@ EOF
 		fi
 	fi
 
-	if [ -e "${TARGET_OUTPUT}/etc/os-release"  ]; then
-		if [ ! -z "$(grep 'ID=\(debian\|ubuntu\)' "${TARGET_OUTPUT}/etc/os-release")" ]; then
-			find ${TARGET_OUTPUT}/var -name \*.log -o -name \*-old -exec rm -rf "{}" \;
-		fi
-	fi
-
-	#term
-	if [ -e "${TARGET_OUTPUT}/etc/arch-release" ]; then
-		if [ ! -z "$(find ${TARGET_OUTPUT}/usr/share/terminfo/ 2> /dev/null | grep '_ADMIN_')" ]; then
-			for t in ${TARGET_OUTPUT}/usr/share/terminfo/*_ADMIN_*
-			do
-				mv ${t} ${t/_ADMIN_*/}
-			done
-		fi
-	fi
-
 	#clean
+	#if [ -e "${TARGET_OUTPUT}/etc/os-release"  ]; then
+	#	if [ ! -z "$(grep 'ID=\(debian\|ubuntu\)' "${TARGET_OUTPUT}/etc/os-release")" ]; then
+	#		find ${TARGET_OUTPUT}/var -name \*.log -o -name \*-old -exec rm -rf "{}" \;
+	#	fi
+	#fi
+	find ${TARGET_OUTPUT}/var -name \*.log -o -name \*-old -exec rm -rf "{}" \;
+
 	rm -rf ${TARGET_OUTPUT}/qemu_*.core
 }
 
