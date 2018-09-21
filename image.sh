@@ -88,11 +88,11 @@ fn_make_alpine() {
 	echo "Bootstrap"
 
 	#local ALPINE_DIST=edge
-	local ALPINE_DIST=v3.8
-	local ALPINE_DIST_CURRENT=v3.8
-	ALPINE_DIST_CURRENT="$(curl -sSL http://dl-cdn.alpinelinux.org/alpine | grep '<a href="v' | tail -1 | sed -e 's/^<a href="\(.*\)\/">.*$/\1/g')"
-	ALPINE_DIST_CURRENT="${ALPINE_DIST_CURRENT:-v3.8}"
-	echo "Current version : ${ALPINE_DIST_CURRENT}"
+	#local ALPINE_DIST=v3.8
+	#ALPINE_DIST="$(curl -sSL http://dl-cdn.alpinelinux.org/alpine | grep '<a href="v' | tail -1 | sed -e 's/^<a href="\(.*\)\/">.*$/\1/g')"
+	local ALPINE_DIST=latest-stable
+	ALPINE_DIST="${ALPINE_DIST:-latest-stable}"
+	echo "Current version : ${ALPINE_DIST}"
 	local ALPINE_MIRROR=http://dl-cdn.alpinelinux.org/alpine
 	#local ALPINE_MIRROR=http://dl-2.alpinelinux.org/alpine
 
@@ -127,13 +127,13 @@ fn_make_alpine() {
 	echo "Configuration"
 
 	#mirror
-	echo "${ALPINE_MIRROR}/${ALPINE_DIST_CURRENT}/main" > ${TARGET_OUTPUT}/etc/apk/repositories
-	echo "${ALPINE_MIRROR}/${ALPINE_DIST_CURRENT}/community" >> ${TARGET_OUTPUT}/etc/apk/repositories
-	if [ "${ALPINE_DIST_CURRENT}" != "edge" ]; then
-		echo "Disable edge"
-		#echo "${ALPINE_MIRROR}/edge/main" >> ${TARGET_OUTPUT}/etc/apk/repositories
-		#echo "${ALPINE_MIRROR}/edge/community" >> ${TARGET_OUTPUT}/etc/apk/repositories
-		#echo "${ALPINE_MIRROR}/edge/testing" >> ${TARGET_OUTPUT}/etc/apk/repositories
+	echo "${ALPINE_MIRROR}/${ALPINE_DIST}/main" > ${TARGET_OUTPUT}/etc/apk/repositories
+	echo "${ALPINE_MIRROR}/${ALPINE_DIST}/community" >> ${TARGET_OUTPUT}/etc/apk/repositories
+	if [ "${ALPINE_DIST}" != "edge" ]; then
+		#echo "Disable edge"
+		echo "${ALPINE_MIRROR}/edge/main" >> ${TARGET_OUTPUT}/etc/apk/repositories
+		echo "${ALPINE_MIRROR}/edge/community" >> ${TARGET_OUTPUT}/etc/apk/repositories
+		echo "${ALPINE_MIRROR}/edge/testing" >> ${TARGET_OUTPUT}/etc/apk/repositories
 	else
 		echo "${ALPINE_MIRROR}/edge/testing" >> ${TARGET_OUTPUT}/etc/apk/repositories
 	fi
@@ -370,8 +370,9 @@ EOF
 fn_make_debian() {
 	local DEBIAN_DIST=${TARGET_EDITION}
 	if [ -z "${DEBIAN_DIST}" ]; then
-		DEBIAN_DIST="$(curl -sSL http://ftp.kaist.ac.kr/debian/dists/README | grep '^stable,' | sed -e 's/^stable, or \([^ ]\+\)\s\+.*$/\1/g')"
-		DEBIAN_DIST="${DEBIAN_DIST:-stretch}"
+		#DEBIAN_DIST="$(curl -sSL http://ftp.kaist.ac.kr/debian/dists/README | grep '^stable,' | sed -e 's/^stable, or \([^ ]\+\)\s\+.*$/\1/g')"
+		#DEBIAN_DIST="${DEBIAN_DIST:-stretch}"
+		DEBIAN_DIST="${DEBIAN_DIST:-stable}"
 	fi
 	echo "Current version : ${DEBIAN_DIST}"
 	#local DEBIAN_MIRROR=http://ftp.kr.debian.org/debian
