@@ -93,7 +93,8 @@ fn_make_alpine() {
 	local ALPINE_DIST=latest-stable
 	ALPINE_DIST="${ALPINE_DIST:-latest-stable}"
 	echo "Current version : ${ALPINE_DIST}"
-	local ALPINE_MIRROR=http://dl-cdn.alpinelinux.org/alpine
+	#local ALPINE_MIRROR=http://dl-cdn.alpinelinux.org/alpine
+	local ALPINE_MIRROR=http://mirror.xtom.com.hk/alpine
 	#local ALPINE_MIRROR=http://dl-2.alpinelinux.org/alpine
 
 	local ALPINE_ARCH=${TARGET_ARCH}
