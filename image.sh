@@ -107,8 +107,9 @@ fn_make_alpine() {
 		mkdir -p ${TARGET_OUTPUT}/usr/bin
 		cp extra/${TARGET_QEMU} ${TARGET_OUTPUT}/usr/bin/
 	fi
-	local APK_VERSION="$(curl -sSL ${ALPINE_MIRROR}/${ALPINE_DIST}/main/${ALPINE_ARCH}/APKINDEX.tar.gz | tar -Oxz | grep --text '^P:apk-tools-static$' -A1 | tail -n1 | cut -d: -f2)"
-	curl -sSL ${ALPINE_MIRROR}/${ALPINE_DIST}/main/${ALPINE_ARCH}/apk-tools-static-${APK_VERSION}.apk | tar -xz -C "${TARGET_OUTPUT}" sbin/apk.static  2>/dev/null
+	local APK_VERSION="$(wget -q -O - ${ALPINE_MIRROR}/${ALPINE_DIST}/main/${ALPINE_ARCH}/APKINDEX.tar.gz | tar -Oxz | grep --text '^P:apk-tools-static$' -A1 | tail -n1 | cut -d: -f2)"
+	wget -q -O - ${ALPINE_MIRROR}/${ALPINE_DIST}/main/${ALPINE_ARCH}/apk-tools-static-${APK_VERSION}.apk | tar -xz -C "${TARGET_OUTPUT}" sbin/apk.static  2>/dev/null
+
 	if [ ! -z "${TARGET_QEMU}" ]; then
 		QEMU_EXECVE=1 /usr/bin/${TARGET_QEMU} -execve ${TARGET_OUTPUT}/sbin/apk.static --repository ${ALPINE_MIRROR}/${ALPINE_DIST}/main --no-cache --no-script --allow-untrusted --root "${TARGET_OUTPUT}" --initdb add busybox alpine-baselayout alpine-keys apk-tools libc-utils
 		for link in $(QEMU_EXECVE=1 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin LANG=C LC_ALL=C chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "/bin/busybox --list-full"); do
@@ -257,7 +258,9 @@ EOF
 	fi
 
 	if [ "${TARGET_ARCH}" = "armhf" ] || [ "${TARGET_ARCH}" = "aarch64" ]; then
-		pacstrap -C ${PACMAN_CONF} -c -d -G -M "${TARGET_OUTPUT}" filesystem pacman shadow grep
+		pacstrap -C ${PACMAN_CONF} -c -d -G -M "${TARGET_OUTPUT}" filesystem pacman shadow grep haveged
+
+		QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "/usr/bin/haveged ; /usr/bin/rm -fr /etc/pacman.d/gnupg ; /usr/bin/pacman-key --init ; /usr/bin/pacman-key --populate ${ARCH_KEYRING} ; /usr/bin/pkill haveged ; /usr/bin/pkill gpg-agent"
 
 		QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "/usr/bin/pacman -Suy --noconfirm ${PACMAN_BASE_PKGS} ${PACMAN_EXTRA_PKGS}"
 	else
@@ -1088,7 +1091,7 @@ fi
 
 #Make
 if [ "${TARGET_MAKE}" = "Y" ]; then
-	if [ -e /etc/alpine-release ]; then
+	if [ -e /.dockerenv -a -e /etc/alpine-release ]; then
 		rm -rf "${TARGET_OUTPUT}" || (echo "Cannot remove ${TARGET_OUTPUT}" ; exit 1)
 		mkdir -p "${TARGET_OUTPUT}" || (echo "Cannot create ${TARGET_OUTPUT}" ; exit 1)
 		chmod 755 ${TARGET_OUTPUT}
@@ -1108,7 +1111,7 @@ fi
 
 #Update
 if [ "${TARGET_UPDATE}" = "Y" ]; then
-	if [ -e /etc/alpine-release ]; then
+	if [ -e /.dockerenv -a -e /etc/alpine-release ]; then
 		eval fn_update
 	else
 		if [ -e /.dockerenv ]; then
