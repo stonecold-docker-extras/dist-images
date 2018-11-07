@@ -934,7 +934,7 @@ if [ ! -e dist ]; then
 fi
 if [ ! -e dist.img ]; then
 	dd if=/dev/zero of=dist.img bs=1G count=10 skip=10
-	mkfs.ext4 dist.img
+	mkfs.ext4 -F dist.img
 	mount -o loop dist.img dist
 	touch dist/img
 elif [ ! -e dist/img ]; then
