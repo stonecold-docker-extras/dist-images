@@ -785,13 +785,13 @@ EOF
 		fi
 
 		#alpinelinux update baselayout
-		#if [ -e "${TARGET_OUTPUT}/etc/alpine-release" ]; then
+		if [ -e "${TARGET_OUTPUT}/etc/alpine-release" ]; then
 			if [ ! -z "${TARGET_QEMU}" ]; then
 				QEMU_EXECVE=1 PATH="${PATH_CHROOT}" LANG=C LC_ALL=C ${CHROOT_CMD} "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "apk --no-cache --allow-untrusted --quiet fetch alpine-base ; cat /alpine-base*.apk | tar -zxf - -C / etc/ ; rm -rf /alpine-base*.apk"
 			else
 				PATH="${PATH_CHROOT}" LANG=C LC_ALL=C ${CHROOT_CMD} "${TARGET_OUTPUT}" /bin/sh -c "apk --no-cache --allow-untrusted --quiet fetch alpine-base ; cat /alpine-base*.apk | tar -zxf - -C / etc/ ; rm -rf /alpine-base*.apk"
 			fi
-		#fi
+		fi
 
 
 		if [ -e "${TARGET_OUTPUT}/etc/arch-release" ]; then
