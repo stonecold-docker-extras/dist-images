@@ -251,6 +251,10 @@ ${PACMAN_MIRRORLIST}
 EOF
 	fi
 
+	#fix error
+	mkdir -p "${TARGET_OUTPUT}"
+	mount -o bind "${TARGET_OUTPUT}" "${TARGET_OUTPUT}"
+
 	#qemu
 	if [ ! -z "${TARGET_QEMU}" ]; then
 		mkdir -p ${TARGET_OUTPUT}/usr/bin
@@ -348,6 +352,9 @@ EOF
 		rm -rf ${TARGET_OUTPUT}/*.pkg.tar.xz
 	fi
 
+	#makepkg
+	sed -i -e 's/(( EUID == 0 ))/false /g' /usr/bin/makepkg
+
 	echo
 
 	echo "Clearing"
@@ -367,6 +374,9 @@ EOF
 	rm -rf ${TARGET_OUTPUT}/tmp/yaourt*
 
 	echo
+
+	#fix error
+	umount "${TARGET_OUTPUT}"
 
 	fn_make_common
 }
@@ -635,6 +645,7 @@ EOF
 	
 	#docker-install
 	if [ -e "${TARGET_OUTPUT}/etc/arch-release" ]; then
+		mount -o bind "${TARGET_OUTPUT}" "${TARGET_OUTPUT}"
 		cp -f extra/docker-install.arch ${TARGET_OUTPUT}/usr/local/bin/docker-install
 		rm -rf ${TARGET_OUTPUT}/usr/local/bin/docker-sysusers ${TARGET_OUTPUT}/usr/local/bin/docker-tmpfiles
 		#cp extra/docker-sysusers ${TARGET_OUTPUT}/usr/local/bin/
@@ -826,6 +837,10 @@ EOF
 	find ${TARGET_OUTPUT}/var -name \*.log -o -name \*-old -exec rm -rf "{}" \;
 
 	rm -rf ${TARGET_OUTPUT}/qemu_*.core
+
+	if [ -e "${TARGET_OUTPUT}/etc/arch-release" ]; then
+		mount -o bind "${TARGET_OUTPUT}" "${TARGET_OUTPUT}"
+	fi
 }
 
 fn_import() {
