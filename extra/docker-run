@@ -30,7 +30,10 @@ else
 
 	docker-chown ${RUN_USER_NAME} ${RUN_USER_HOME}
 
-	RUN_USER_SHELL=$(getent passwd ${RUN_USER_NAME} | cut -d ':' -f 7)
-	exec su-exec ${RUN_USER_NAME} ${RUN_USER_SHELL} --login
+	#RUN_USER_SHELL=$(getent passwd ${RUN_USER_NAME} | cut -d ':' -f 7)
+	#exec su-exec ${RUN_USER_NAME} ${RUN_USER_SHELL} --login
+
+	RUN_USER_SHELL=$(getent passwd root | cut -d ':' -f 7)
+	exec ${RUN_USER_SHELL} --login
 fi
 
