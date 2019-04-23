@@ -433,7 +433,7 @@ fn_make_debian_common() {
 	if ! debootstrap --help &>/dev/null ; then
 		#echo "Could not find debootstrap. Run pacman -S debootstrap"
 		#exit 1
-		pacman -Suy --noconfirm debootstrap
+		apk add debootstrap
 	fi
 
 	alias apt-get="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin LANG=C LC_ALL=C DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true /usr/bin/apt-get -o Acquire::Languages=none -o Acquire::GzipIndexes=true -o Acquire::CompressionTypes::Order::=gz -o APT::Install-Recommends=false -o APT::Install-Suggests=false" 
