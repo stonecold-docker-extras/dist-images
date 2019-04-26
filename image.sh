@@ -99,7 +99,8 @@ fn_make_alpine() {
 
 	local ALPINE_ARCH=${TARGET_ARCH}
 	ALPINE_ARCH=${ALPINE_ARCH/x64/x86_64}
-	ALPINE_ARCH=${ALPINE_ARCH/armv7h/armhf}
+	ALPINE_ARCH=${ALPINE_ARCH/armv7h/armv7}
+	ALPINE_ARCH=${ALPINE_ARCH/armhf/armv7}
 	ALPINE_ARCH=${ALPINE_ARCH/aarch64/aarch64}
 
 	#qemu
