@@ -90,8 +90,8 @@ fn_make_alpine() {
 	#local ALPINE_DIST=edge
 	#local ALPINE_DIST=v3.8
 	#ALPINE_DIST="$(curl -sSL http://dl-cdn.alpinelinux.org/alpine | grep '<a href="v' | tail -1 | sed -e 's/^<a href="\(.*\)\/">.*$/\1/g')"
-	local ALPINE_DIST=latest-stable
-	ALPINE_DIST="${ALPINE_DIST:-latest-stable}"
+	#local ALPINE_DIST="${ALPINE_DIST:-latest-stable}"
+	local ALPINE_DIST="${ALPINE_DIST:-edge}"
 	echo "Current version : ${ALPINE_DIST}"
 	#local ALPINE_MIRROR=http://dl-cdn.alpinelinux.org/alpine
 	local ALPINE_MIRROR=http://mirror.xtom.com.hk/alpine
@@ -130,15 +130,16 @@ fn_make_alpine() {
 	echo "Configuration"
 
 	#mirror
-	echo "${ALPINE_MIRROR}/${ALPINE_DIST}/main" > ${TARGET_OUTPUT}/etc/apk/repositories
-	echo "${ALPINE_MIRROR}/${ALPINE_DIST}/community" >> ${TARGET_OUTPUT}/etc/apk/repositories
-	if [ "${ALPINE_DIST}" != "edge" ]; then
+	if [ "${ALPINE_DIST}" = "edge" ]; then
 		#echo "Disable edge"
+		echo "${ALPINE_MIRROR}/latest-stable/main" > ${TARGET_OUTPUT}/etc/apk/repositories
+		echo "${ALPINE_MIRROR}/latest-stable/community" >> ${TARGET_OUTPUT}/etc/apk/repositories
 		echo "${ALPINE_MIRROR}/edge/main" >> ${TARGET_OUTPUT}/etc/apk/repositories
 		echo "${ALPINE_MIRROR}/edge/community" >> ${TARGET_OUTPUT}/etc/apk/repositories
 		echo "${ALPINE_MIRROR}/edge/testing" >> ${TARGET_OUTPUT}/etc/apk/repositories
 	else
-		echo "${ALPINE_MIRROR}/edge/testing" >> ${TARGET_OUTPUT}/etc/apk/repositories
+		echo "${ALPINE_MIRROR}/${ALPINE_DIST}/main" > ${TARGET_OUTPUT}/etc/apk/repositories
+		echo "${ALPINE_MIRROR}/${ALPINE_DIST}/community" >> ${TARGET_OUTPUT}/etc/apk/repositories
 	fi
 
 	#resolve
@@ -949,8 +950,11 @@ if [ ! -e dist ]; then
 	mkdir -p dist
 fi
 if [ ! -e dist.img ]; then
-	dd if=/dev/zero of=dist.img bs=1G count=10 skip=10
-	mkfs.ext4 -F dist.img
+	truncate -s 5G dist.img
+	losetup -f ./dist.img
+	lo_dev="$(losetup -j ./dist.img | cut -d ':' -f 1)"
+	mkfs.ext4 -F ${lo_dev}
+	losetup -d ${lo_dev}
 	mount -o loop dist.img dist
 	touch dist/img
 elif [ ! -e dist/img ]; then

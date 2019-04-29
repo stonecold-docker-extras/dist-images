@@ -13,8 +13,14 @@ if [ ! -e ${MOUNT_DIR} ]; then
 fi
 
 if [ ! -e ${SRC_DIR}/dist.img ]; then
-	dd if=/dev/zero of=${SRC_DIR}/dist.img bs=1M count=0 seek=20480
-	mkfs.ext4 -F ${SRC_DIR}/dist.img
+	#dd if=/dev/zero of=${SRC_DIR}/dist.img bs=1M count=0 seek=20480
+	#mkfs.ext4 -F ${SRC_DIR}/dist.img
+
+	truncate -s 5G src.img
+	losetup -f ./src.img
+	lo_dev="$(losetup -j ./src.img | cut -d ':' -f 1)"
+	mkfs.ext4 -F ${lo_dev}
+	losetup -d ${lo_dev}
 fi
 mount -o loop ${SRC_DIR}/dist.img ${MOUNT_DIR}
 chown ${RUN_USER_UID}:${RUN_USER_GID} ${MOUNT_DIR}
