@@ -50,7 +50,8 @@ if [ "${USER_UID}" = "0" ]; then
 	exit 0
 fi
 
-if [ -z $(getent group ${USER_GID}) ]; then
+#if [ -z "$(getent group ${USER_GID})" ]; then
+if [ -z "$(grep "^[^:]*:[^:]*:${USER_GID}:" /etc/group)" ]; then
 	if [ -x /usr/sbin/addgroup -o -x /sbin/addgroup ]; then
 		addgroup -g ${USER_GID} $([ "${SYSTEM_ACCOUNT}" = "Y" ] && echo "-S") ${USER_NAME}
 	fi
@@ -58,7 +59,8 @@ if [ -z $(getent group ${USER_GID}) ]; then
 		groupadd -g ${USER_GID} $([ "${SYSTEM_ACCOUNT}" = "Y" ] && echo "-r") ${USER_NAME}
 	fi
 fi
-USER_GROUP="$(getent group ${USER_GID} | cut -d ':' -f 1)"
+#USER_GROUP="$(getent group ${USER_GID} | cut -d ':' -f 1)"
+USER_GROUP="$(grep "^[^:]*:[^:]*:${USER_GID}:" /etc/group | cut -d ':' -f 1)" 
 
 if [ -z "${USER_SHELL}" ]; then
 	if [ -e /bin/bash ]; then
@@ -87,7 +89,8 @@ if [ -x /usr/sbin/useradd -o -x /sbin/useradd ]; then
 		IFS=,
 		for group in ${USER_GROUPS}
 		do
-			if [ ! -z "$(getent group ${group})" -a -z "$(id -Gn ${USER_NAME} | grep -w -o ${group})" ]; then
+			#if [ ! -z "$(getent group ${group})" -a -z "$(id -Gn ${USER_NAME} | grep -w -o ${group})" ]; then
+			if [ ! -z "$(grep "^${group}:" /etc/group)" -a -z "$(id -Gn ${USER_NAME} | grep -w -o ${group})" ]; then
 				usermod -a -G ${group} ${USER_NAME}
 			fi
 		done
@@ -95,12 +98,23 @@ if [ -x /usr/sbin/useradd -o -x /sbin/useradd ]; then
 	fi
 elif [ -x /usr/sbin/adduser -o -x /sbin/adduser ]; then
 	adduser -h ${USER_HOME} -G ${USER_GROUP} -s ${USER_SHELL} -D -u ${USER_UID} $([ -e "${USER_HOME}" ] && echo "-H") $([ "${SYSTEM_ACCOUNT}" = "Y" ] && echo "-S") ${USER_NAME}
-	delgroup ${USER_NAME} ${USER_GROUP}
+	if [ "${USER_UID}" != "${USER_GID}" ]; then
+		delgroup ${USER_NAME}
+
+		if [ -z "$(grep "^${USER_GROUP}:.*:.*${USER_NAME}" /etc/group)" ]; then
+			if [ -z "$(grep "^${USER_GROUP}:.*:.\+" /etc/group)" ]; then
+				sed -i -e "s/^\(${USER_GROUP}:.*\)$/\1${USER_NAME}/g" /etc/group
+			else
+				sed -i -e "s/^\(${USER_GROUP}:.*\)$/\1,${USER_NAME}/g" /etc/group
+			fi
+		fi
+	fi
 	if [ ! -z "${USER_GROUPS}" ]; then
 		IFS=,
 		for group in ${USER_GROUPS}
 		do
-			if [ ! -z "$(getent group ${group})" -a -z "$(id -Gn ${USER_NAME} | grep -w -o ${group})" ]; then
+			#if [ ! -z "$(getent group ${group})" -a -z "$(id -Gn ${USER_NAME} | grep -w -o ${group})" ]; then
+			if [ ! -z "$(grep "^${group}:" /etc/group)" -a -z "$(id -Gn ${USER_NAME} | grep -w -o ${group})" ]; then
 				adduser ${USER_NAME} ${group}
 			fi
 		done

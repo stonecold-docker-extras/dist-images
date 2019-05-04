@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-for dist in arch debian ubuntu alpine
+for dist in arch entware debian ubuntu alpine
 do
 	for arch in x64 armhf aarch64
 	do

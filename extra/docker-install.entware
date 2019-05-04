@@ -1,0 +1,83 @@
+#!/bin/sh
+
+fn_usage() {
+	echo "Usage : $(basename "${0}") [package]"
+	exit 1
+}
+
+fn_refresh() {
+	opkg update $@
+}
+
+fn_update() {
+	opkg upgrade $@
+}
+
+fn_install() {
+	opkg install $@
+}
+
+fn_del() {
+	opkg remove $@ --autoremove
+}
+
+fn_clean() {
+	rm -rf /qemu_sh_*.core /opt/tmp/opkg-* /var/opkg-lists/*
+}
+
+
+#Main
+if [ -z "${1}" ]; then
+	fn_usage
+fi
+
+if [ "$(id -u)" != "0" ]; then
+	echo "root privileges are required"
+	exit 1
+fi
+
+PARAM_REFRESH=N
+PARAM_UPDATE=N
+PARAM_DEL=N
+PARAM_CLEAN=N
+PARAM_EXTRA=
+PACKAGES=
+
+while [ ${#} -gt 0 ]
+do
+	case "${1}" in
+		-h|--help) fn_usage ;;
+		-r|--refresh) PARAM_REFRESH=Y ;;
+		-u|--update) PARAM_UPDATE=Y ;;
+		-d|--del) PARAM_DEL=Y ;;
+		-c|--cean) PARAM_CLEAN=Y ;;
+		-o) PARAM_EXTRA="${PARAM_EXTRA} ${1} ${2}" ; shift ;;
+		*) PACKAGES="${PACKAGES} ${1}" ;;
+	esac
+	shift
+done
+
+if [ "${PARAM_REFRESH}" = "Y" ]; then
+	fn_refresh ${PARAM_EXTRA}
+elif [ "${PARAM_UPDATE}" = "Y" ]; then
+	fn_refresh ${PARAM_EXTRA}
+elif [ ! -z "${PACKAGES}" -a -z "$(ls /var/cache/apk/* 2> /dev/null)" ]; then
+	fn_refresh ${PARAM_EXTRA}
+fi
+
+if [ "${PARAM_UPDATE}" = "Y" ]; then
+	fn_update ${PARAM_EXTRA}
+fi
+
+if [ ! -z "${PACKAGES}" ]; then
+	if [ "${PARAM_DEL}" = "N" ]; then
+		fn_install ${PARAM_EXTRA} ${PACKAGES}
+	else
+		fn_del ${PARAM_EXTRA} ${PACKAGES}
+	fi
+fi
+
+if [ "${PARAM_CLEAN}" = "Y" ]; then
+	fn_clean
+fi
+

@@ -49,7 +49,7 @@ fn_run_docker() {
 
 fn_usage() {
 	echo "Usage : $(basename "${0}") [-d distro] [-a architecture] [-o output] [-l locale] [-z timezone] [--include include packages] [--exclud exclude pacakges] [-m] [-s] [-i] [-p] [-q]"
-	echo "          [-d distro] : arch,alpine,debian,ubuntu (default : arch)"
+	echo "          [-d distro] : arch,alpine,debian,entware,ubuntu (default : arch)"
 	echo "          [-a architecture] : x64(x86_64),armv7h(armhf),aarch64(arm64) (default : x64)"
 	echo "          [-e edition] : debian, ubuntu option"
 	echo "          [-o output] : output dir (default : distro_archtecture)"
@@ -175,6 +175,159 @@ EOF
 
 	rm -rf ${TARGET_OUTPUT}/sbin/apk.static
 	rm -rf ${TARGET_OUTPUT}/var/cache/apk/*
+	rm -rf ${TARGET_OUTPUT}/tmp/*
+
+	echo
+
+	fn_make_common
+}
+
+fn_make_entware() {
+	echo "Bootstrap"
+
+	local ENTWARE_VER=
+	if [ "${TARGET_ARCH}" = "x64" ]; then
+		ENTWARE_VER="$(wget http://bin.entware.net/ -q -O - | grep 'x64-' | tail -1 | sed -e 's/^.*a href="\([^"]*\)\/".*$/\1/g')"
+	elif [ "${TARGET_ARCH}" = "aarch64" ]; then
+		ENTWARE_VER="$(wget http://bin.entware.net/ -q -O - | grep 'aarch64-' | tail -1 | sed -e 's/^.*a href="\([^"]*\)\/".*$/\1/g')"
+	elif [ "${TARGET_ARCH}" = "armhf" ]; then
+		ENTWARE_VER="$(wget http://bin.entware.net/ -q -O - | grep 'armv7sf-' | tail -1 | sed -e 's/^.*a href="\([^"]*\)\/".*$/\1/g')"
+	fi
+
+	# Need busbox for bootstrapping
+	local ALPINE_ARCH=${TARGET_ARCH}
+	ALPINE_ARCH=${ALPINE_ARCH/x64/x86_64}
+	ALPINE_ARCH=${ALPINE_ARCH/armv7h/armv7}
+	ALPINE_ARCH=${ALPINE_ARCH/armhf/armv7}
+	ALPINE_ARCH=${ALPINE_ARCH/aarch64/aarch64}
+
+	local busybox="https://mirror.xtom.com.hk/alpine/edge/main/${ALPINE_ARCH}/$(wget https://mirror.xtom.com.hk/alpine/edge/main/${ALPINE_ARCH}/ -q -O - | grep busybox-static | sed -e 's/^.*href="\([^"]*\)".*$/\1/g')"
+	wget "${busybox}" -q -O - | tar zxf - -C ${TARGET_OUTPUT}/
+	rm -rf ${TARGET_OUTPUT}/.PKGINFO ${TARGET_OUTPUT}/.SIGN.RSA*
+	#qemu
+	if [ ! -z "${TARGET_QEMU}" ]; then
+		mkdir -p ${TARGET_OUTPUT}/usr/bin
+		cp extra/${TARGET_QEMU} ${TARGET_OUTPUT}/usr/bin/
+	fi
+
+	if [ ! -z "${TARGET_QEMU}" ]; then
+		QEMU_EXECVE=1 PATH="/opt/sbin:/opt/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/busybox.static --install /bin
+	else
+		chroot ${TARGET_OUTPUT} /bin/busybox.static --install /bin
+	fi
+
+	#Create basic directory
+	for folder in bin sbin usr lib root dev etc home proc run sys tmp var
+	do
+		mkdir -p ${TARGET_OUTPUT}/${folder}
+	done
+
+	#resolve
+	cat << EOF > ${TARGET_OUTPUT}/etc/resolv.conf
+nameserver 1.1.1.1
+nameserver 1.0.0.1
+EOF
+
+	#Ignore locales
+	mkdir --p ${TARGET_OUTPUT}/opt/usr/lib/locale
+	touch ${TARGET_OUTPUT}/opt/usr/lib/locale/locale-archive
+
+	#Intall entware
+	wget http://bin.entware.net/${ENTWARE_VER}/installer/generic.sh -q -O ${TARGET_OUTPUT}/entware_install.sh
+	#sed -i -e 's|/opt/bin/opkg install entware-opt|#/opt/bin/opkg install entware-opt|g' ${TARGET_OUTPUT}/entware_install.sh
+	if [ ! -z "${TARGET_QEMU}" ]; then
+		QEMU_EXECVE=1 PATH="/opt/sbin:/opt/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh /entware_install.sh
+	else
+		chroot "${TARGET_OUTPUT}" /bin/sh /entware_install.sh
+	fi
+	rm -rf ${TARGET_OUTPUT}/entware_install.sh
+
+	#Insall busybox
+	if [ ! -z "${TARGET_QEMU}" ]; then
+		QEMU_EXECVE=1 PATH="/opt/sbin:/opt/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /opt/bin/opkg install busybox ca-certificates wget
+	else
+		chroot "${TARGET_OUTPUT}" /opt/bin/opkg install busybox ca-certificates wget
+	fi
+	for bb in ash sh netstat
+	do
+		ln -sf /opt/bin/busybox ${TARGET_OUTPUT}/opt/bin/${bb}
+	done
+	rm -rf ${TARGET_OUTPUT}/bin/*
+	
+	#Link directory
+	for x in $(ls ${TARGET_OUTPUT}/opt/)
+	do
+		if [ ! -d ${TARGET_OUTPUT}/opt/${x} ] ; then
+			continue
+		fi
+		opt_dir=$(basename "${x}")
+		if [ "${opt_dir}" != "etc" -a "${opt_dir}" != "root" -a "${opt_dir}" != "home" -a "${opt_dir}" != "share" ]; then
+			rm -rf ${TARGET_OUTPUT}/${opt_dir}
+			#mv ${TARGET_OUTPUT}/opt/${opt_dir} ${TARGET_OUTPUT}/${opt_dir}
+			#ln -s ../${opt_dir} ${TARGET_OUTPUT}/opt/${opt_dir}
+			ln -s opt/${opt_dir} ${TARGET_OUTPUT}/${opt_dir}
+		fi
+	done
+	mkdir -p ${TARGET_OUTPUT}/usr/bin ${TARGET_OUTPUT}/usr/sbin ${TARGET_OUTPUT}/usr/local/bin ${TARGET_OUTPUT}/usr/local/sbin
+	if [ "${TARGET_OUTPUT}" = "x64" ]; then
+		ln -s opt/lib ${TARGET_OUTPUT}/lib64
+	fi
+	if [ ! -z "${TARGET_QEMU}" ]; then
+		mkdir -p ${TARGET_OUTPUT}/usr/bin
+		cp extra/${TARGET_QEMU} ${TARGET_OUTPUT}/usr/bin/
+	fi
+	rm -rf ${TARGET_OUTPUT}/etc
+	cp -r ${TARGET_OUTPUT}/opt/etc ${TARGET_OUTPUT}/etc
+	rm -rf ${TARGET_OUTPUT}/etc/*.1
+	cat << EOF > ${TARGET_OUTPUT}/etc/passwd
+root::0:0:Root:/root:/opt/bin/sh
+nobody:x:99:99::/opt/home:/opt/bin/false
+EOF
+	cat << EOF > ${TARGET_OUTPUT}/etc/group
+root:x:0:root
+nobody:x:98:nobody
+nogroup:x:99:
+users:x:100:
+EOF
+	cp -ar ${TARGET_OUTPUT}/etc/skel/. ${TARGET_OUTPUT}/root/
+	ln -sf /etc/passwd ${TARGET_OUTPUT}/opt/etc/passwd
+	ln -sf /etc/group ${TARGET_OUTPUT}/opt/etc/group
+	if [ -e "/etc/zoneinfo/${TARGET_TIMEZONE}" ]; then
+		cat "/etc/zoneinfo/${TARGET_TIMEZONE}" > ${TARGET_OUTPUT}/etc/localtime
+	elif [ -e /etc/localtime ]; then
+		cat /etc/localtime/${TARGET_OUTPUT}/etc/localtime
+	fi
+
+	#resolve
+	cat << EOF > ${TARGET_OUTPUT}/etc/resolv.conf
+nameserver 1.1.1.1
+nameserver 1.0.0.1
+EOF
+
+	#Locales
+	rm -rf ${TARGET_OUTPUT}/opt/usr/lib/locale/locale-archive
+	mkdir -p ${TARGET_OUTPUT}/locales
+	wget http://pkg.entware.net/sources/i18n_glib227.tar.gz -q -O - | tar zxf - -C ${TARGET_OUTPUT}/locales/
+	cp ${TARGET_OUTPUT}/locales/i18n/locales/translit_hangul ${TARGET_OUTPUT}/opt/usr/share/i18n/locales/translit_hangul
+	cp ${TARGET_OUTPUT}/locales/i18n/locales/ko_KR ${TARGET_OUTPUT}/opt/usr/share/i18n/locales/ko_KR
+	cp ${TARGET_OUTPUT}/locales/i18n/charmaps/EUC-KR.gz ${TARGET_OUTPUT}/opt/usr/share/i18n/charmaps/EUC-KR.gz
+	gzip -dc ${TARGET_OUTPUT}/locales/i18n/charmaps/EUC-KR.gz > ${TARGET_OUTPUT}/opt/usr/share/i18n/charmaps/EUC-KR
+	cp ${TARGET_OUTPUT}/locales/i18n/charmaps/KSC5636.gz ${TARGET_OUTPUT}/opt/usr/share/i18n/charmaps/KSC5636.gz
+	gzip -dc ${TARGET_OUTPUT}/locales/i18n/charmaps/KSC5636.gz > ${TARGET_OUTPUT}/opt/usr/share/i18n/charmaps/KSC5636
+	cp ${TARGET_OUTPUT}/locales/i18n/charmaps/CP949.gz ${TARGET_OUTPUT}/opt/usr/share/i18n/charmaps/CP949.gz
+	gzip -dc ${TARGET_OUTPUT}/locales/i18n/charmaps/CP949.gz > ${TARGET_OUTPUT}/opt/usr/share/i18n/charmaps/CP949
+	rm -rf ${TARGET_OUTPUT}/locales
+	if [ ! -z "${TARGET_QEMU}" ]; then
+		QEMU_EXECVE=1 PATH="/opt/sbin:/opt/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /opt/bin/localedef.new -c -f UTF-8 -i en_US en_US.UTF-8
+		QEMU_EXECVE=1 PATH="/opt/sbin:/opt/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /opt/bin/localedef.new -c -f UTF-8 -i ko_KR ko_KR.UTF-8
+	else
+		chroot "${TARGET_OUTPUT}" /opt/bin/localedef.new -c -f UTF-8 -i en_US en_US.UTF-8
+		chroot "${TARGET_OUTPUT}" /opt/bin/localedef.new -c -f UTF-8 -i ko_KR ko_KR.UTF-8
+	fi
+
+	echo "Clearing"
+
+	rm -rf ${TARGET_OUTPUT}/opt/tmp/opkg-*
 	rm -rf ${TARGET_OUTPUT}/tmp/*
 
 	echo
@@ -408,7 +561,7 @@ fn_make_ubuntu() {
 	local DEBIAN_DIST=${TARGET_EDITION}
 	if [ -z "${DEBIAN_DIST}" ]; then
 		#DEBIAN_DIST="$(curl -sSL http://ftp.kaist.ac.kr/ubuntu/dists/ | grep -v 'backports' | grep -v 'proposed' | grep -v 'security' | grep -v 'updates' | grep '<tr><td class="n">' | tail -1  | sed -e 's/^<tr><td class="n"><a href="\(.*\)\/">.*$/\1/g')"
-		DEBIAN_DIST="${DEBIAN_DIST:-cosmic}"
+		DEBIAN_DIST="${DEBIAN_DIST:-disco}"
 	fi
 	echo "Current version : ${DEBIAN_DIST}"
 	local DEBIAN_MIRROR=
@@ -627,6 +780,9 @@ nameserver 1.1.1.1
 nameserver 1.0.0.1
 EOF
 
+
+	mkdir -p ${TARGET_OUTPUT}/usr/bin ${TARGET_OUTPUT}/usr/sbin ${TARGET_OUTPUT}/usr/local/bin ${TARGET_OUTPUT}/usr/local/sbin
+
 	#clear
 	rm -rf ${TARGET_OUTPUT}/usr/local/bin/docker-*
 
@@ -646,7 +802,11 @@ EOF
 	cp extra/docker-run ${TARGET_OUTPUT}/usr/local/bin/docker-run
 	
 	#docker-install
-	if [ -e "${TARGET_OUTPUT}/etc/arch-release" ]; then
+	if [ -e "${TARGET_OUTPUT}/etc/alpine-release" ]; then
+		cp -f extra/docker-install.alpine ${TARGET_OUTPUT}/usr/local/bin/docker-install
+	elif [ -e "${TARGET_OUTPUT}/opt/bin/opkg" ]; then
+		cp -f extra/docker-install.entware ${TARGET_OUTPUT}/usr/local/bin/docker-install
+	elif [ -e "${TARGET_OUTPUT}/etc/arch-release" ]; then
 		mount -o bind "${TARGET_OUTPUT}" "${TARGET_OUTPUT}"
 		cp -f extra/docker-install.arch ${TARGET_OUTPUT}/usr/local/bin/docker-install
 		rm -rf ${TARGET_OUTPUT}/usr/local/bin/docker-sysusers ${TARGET_OUTPUT}/usr/local/bin/docker-tmpfiles
@@ -655,8 +815,6 @@ EOF
 		mount -o bind ${TARGET_OUTPUT} ${TARGET_OUTPUT}
 	elif [ -e "${TARGET_OUTPUT}/etc/os-release" -a ! -z "$(grep "ID=\(debian\|ubuntu\)" "${TARGET_OUTPUT}/etc/os-release")" ]; then
 		cp -f extra/docker-install.deb ${TARGET_OUTPUT}/usr/local/bin/docker-install
-	elif [ -e "${TARGET_OUTPUT}/etc/alpine-release" ]; then
-		cp -f extra/docker-install.alpine ${TARGET_OUTPUT}/usr/local/bin/docker-install
 	fi
 	rm -rf ${TARGET_OUTPUT}/usr/local/bin/docker-su
 	#cp extra/docker-su ${TARGET_OUTPUT}/usr/local/bin/docker-su
@@ -767,7 +925,13 @@ EOF
 	PATH_CHROOT=
 	CHROOT_CMD=chroot
 	if [ "${TARGET_UPDATE}" = "Y" ]; then
-		if [ -e "${TARGET_OUTPUT}/etc/arch-release" ]; then
+		if [ -e "${TARGET_OUTPUT}/etc/alpine-release" ]; then
+			prev_md5=$(md5sum ${TARGET_OUTPUT}/lib/apk/db/installed | cut -f 1 -d ' ')
+			PATH_CHROOT=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+		elif [ -e "${TARGET_OUTPUT}/opt/bin/opkg" ]; then
+			prev_md5=$(md5sum ${TARGET_OUTPUT}/opt/lib/opkg/status | cut -f 1 -d ' ')
+			PATH_CHROOT=/opt/sbin:/opt/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+		elif [ -e "${TARGET_OUTPUT}/etc/arch-release" ]; then
 			prev_md5=$(tar -cf - ${TARGET_OUTPUT}/var/lib/pacman/local 2> /dev/null | md5sum | cut -f 1 -d ' ')
 			PATH_CHROOT="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl"
 			if [ -e /usr/bin/arch-chroot ]; then
@@ -777,9 +941,6 @@ EOF
 			prev_md5=$(tar -cf - ${TARGET_OUTPUT}/var/lib/dpkg/info 2> /dev/null | md5sum | cut -f 1 -d ' ')
 			PATH_CHROOT="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 			rm -rf ${TARGET_OUTPUT}/var/lib/apt/lists/lock
-		elif [ -e "${TARGET_OUTPUT}/etc/alpine-release" ]; then
-			prev_md5=$(md5sum ${TARGET_OUTPUT}/lib/apk/db/installed | cut -f 1 -d ' ')
-			PATH_CHROOT=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 		fi
 		
 		if [ "${TARGET_ARCH}" = "armhf" ] || [ "${TARGET_ARCH}" = "aarch64" ]; then
@@ -807,14 +968,16 @@ EOF
 		fi
 
 
-		if [ -e "${TARGET_OUTPUT}/etc/arch-release" ]; then
+		if [ -e "${TARGET_OUTPUT}/etc/alpine-release" ]; then
+			post_md5=$(md5sum ${TARGET_OUTPUT}/lib/apk/db/installed | cut -f 1 -d ' ')
+		elif [ -e "${TARGET_OUTPUT}/opt/bin/opkg" ]; then
+			post_md5=$(md5sum ${TARGET_OUTPUT}/opt/lib/opkg/status | cut -f 1 -d ' ')
+		elif [ -e "${TARGET_OUTPUT}/etc/arch-release" ]; then
 			post_md5=$(tar -cf - ${TARGET_OUTPUT}/var/lib/pacman/local 2> /dev/null | md5sum | cut -f 1 -d ' ')
 		elif [ -e "${TARGET_OUTPUT}/etc/os-release" -a ! -z "$(grep "ID=debian" "${TARGET_OUTPUT}/etc/os-release")" ]; then
 			post_md5=$(tar -cf - ${TARGET_OUTPUT}/var/lib/dpkg/info 2> /dev/null | md5sum | cut -f 1 -d ' ')
 		elif [ -e "${TARGET_OUTPUT}/etc/os-release" -a ! -z "$(grep "ID=ubuntu" "${TARGET_OUTPUT}/etc/os-release")" ]; then
 			post_md5=$(tar -cf - ${TARGET_OUTPUT}/var/lib/dpkg/info 2> /dev/null | md5sum | cut -f 1 -d ' ')
-		elif [ -e "${TARGET_OUTPUT}/etc/alpine-release" ]; then
-			post_md5=$(md5sum ${TARGET_OUTPUT}/lib/apk/db/installed | cut -f 1 -d ' ')
 		fi
 		echo
 
@@ -865,12 +1028,18 @@ fn_import() {
 	else
 		shell=/bin/sh
 	fi
-	if [ "${TARGET_ARCH}" != "x64" -a "${TARGET_ARCH}" != "x86" ] ; then
-		#cmd="tar --numeric-owner --xattrs --acls -C ${TARGET_OUTPUT} -c . | docker import --change \"ENTRYPOINT ${shell}\" --change \"ENV QEMU_EXECVE=1\" - ${TARGET_NAME}:${TARGET_TAG}"
-		cmd="tar --numeric-owner --xattrs --acls -C ${TARGET_OUTPUT} -c . | docker import --change \"ENTRYPOINT docker-run\" --change \"ENV QEMU_EXECVE=1\" - ${TARGET_NAME}:${TARGET_TAG}"
-	else
-		cmd="tar --numeric-owner --xattrs --acls -C ${TARGET_OUTPUT} -c . | docker import --change \"ENTRYPOINT docker-run\" - ${TARGET_NAME}:${TARGET_TAG}"
+
+	cmd="tar --numeric-owner --xattrs --acls -C ${TARGET_OUTPUT} -c ."
+	cmd+=" | docker import --change \"ENTRYPOINT docker-run\""
+	if [ "${TARGET_DISTRO}" = "entware" ] ; then
+		cmd+=" --change \"ENV LD_LIBRARY_PATH=/opt/lib\""
+		cmd+=" --change \"ENV PATH=/opt/sbin:/opt/bin:/usr/local/sbin:/usr/sbin:/sbin:/usr/local/bin:/usr/bin:/bin\""
 	fi
+	if [ "${TARGET_ARCH}" != "x64" ] ; then
+		cmd+=" --change \"ENV QEMU_EXECVE=1\""
+	fi
+	cmd+=" - ${TARGET_NAME}:${TARGET_TAG}"
+
 	echo
 	if [ "${DEBUG}" = "Y" ]; then
 		echo "COMMAND : ${cmd}"
@@ -968,7 +1137,7 @@ fi
 
 #set default
 #TARGET_DISTRO="${TARGET_DISTRO:-arch}"
-if [ "${TARGET_DISTRO}" != "alpine" -a "${TARGET_DISTRO}" != "arch" -a "${TARGET_DISTRO}" != "debian" -a "${TARGET_DISTRO}" != "ubuntu" ]; then
+if [ "${TARGET_DISTRO}" != "alpine" -a "${TARGET_DISTRO}" != "arch" -a "${TARGET_DISTRO}" != "debian" -a "${TARGET_DISTRO}" != "ubuntu" -a "${TARGET_DISTRO}" != "entware" ]; then
 	fn_usage
 fi
 if [ -z "${TARGET_ARCH}" -o "${TARGET_ARCH}" = "x86_64" ]; then
