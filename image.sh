@@ -269,7 +269,7 @@ EOF
 		fi
 	done
 	mkdir -p ${TARGET_OUTPUT}/usr/bin ${TARGET_OUTPUT}/usr/sbin ${TARGET_OUTPUT}/usr/local/bin ${TARGET_OUTPUT}/usr/local/sbin
-	if [ "${TARGET_OUTPUT}" = "x64" ]; then
+	if [ "${TARGET_ARCH}" = "x64" ]; then
 		ln -s opt/lib ${TARGET_OUTPUT}/lib64
 	fi
 	if [ ! -z "${TARGET_QEMU}" ]; then
