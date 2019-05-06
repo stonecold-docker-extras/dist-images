@@ -1,3 +1,0 @@
-[submodule "extra"]
-	path = extra
-	url = git@bitbucket.org:forumi0721/docker-extras.git
