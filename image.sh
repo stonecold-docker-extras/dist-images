@@ -244,9 +244,6 @@ EOF
 	else
 		chroot "${TARGET_OUTPUT}" /bin/sh -c "/bin/sh /entware_install.sh ; /opt/bin/opkg install opkg busybox"
 	fi
-	if [ "${TARGET_ARCH}" = "armhf" ]; then
-		ln -s ld-2.27.so ${TARGET_OUTPUT}/lib/ld-linux-armhf.so.3
-	fi
 	rm -rf ${TARGET_OUTPUT}/entware_install.sh
 	rm -rf ${TARGET_OUTPUT}/bin ${TARGET_OUTPUT}/sbin ${TARGET_OUTPUT}/lib
 	ln -s opt/bin ${TARGET_OUTPUT}/bin
@@ -255,8 +252,11 @@ EOF
 	if [ "${TARGET_ARCH}" = "x64" ]; then
 		ln -s opt/lib ${TARGET_OUTPUT}/lib64
 	fi
+	if [ "${TARGET_ARCH}" = "armhf" ]; then
+		ln -s ld-2.27.so ${TARGET_OUTPUT}/lib/ld-linux-armhf.so.3
+	fi
 	if [ ! -z "${TARGET_QEMU}" ]; then
-		QEMU_EXECVE=1 PATH="/opt/sbin:/opt/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "/opt/bin/opkg update ; /opt/bin/opkg download entware-ng"
+		QEMU_EXECVE=1 PATH="/opt/sbin:/opt/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "/opt/bin/opkg update ; /opt/bin/opkg download entware-opt"
 	else
 		chroot "${TARGET_OUTPUT}" /bin/sh -c "/opt/bin/opkg update ; /opt/bin/opkg download entware-opt"
 	fi
