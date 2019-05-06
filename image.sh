@@ -43,7 +43,7 @@ fn_run_docker() {
 	fi
 
 	[ "${DEBUG}" = "Y" ] && set -x
-	docker run  --rm --sig-proxy=false --privileged -e RUN_USER_NAME=${user} -e RUN_USER_UID=${uid} -e RUN_USER_GID=${gid} -e LANG=${lang} -e LC_ALL=${lc_all} -v ${workdir}:${dockerdir} -v ${workscript}:/usr/local/bin/docker-run-alt -v ${workdir}/extra/qemu-arm-static:/usr/bin/qemu-arm-static -v ${workdir}/extra/qemu-aarch64-static:/usr/bin/qemu-aarch64-static -h ${dockername} --name ${dockername} -e DOCKER_WORKDIR=${dockerdir} forumi0721alpinex64/alpine-x64-dev:latest - "${@}"
+	docker run  --rm --sig-proxy=false --privileged -e RUN_USER_NAME=${user} -e RUN_USER_UID=${uid} -e RUN_USER_GID=${gid} -e LANG=${lang} -e LC_ALL=${lc_all} -v ${workdir}:${dockerdir} -v ${workscript}:/usr/local/bin/docker-run-alt -v ${workdir}/extras/qemu-arm-static:/usr/bin/qemu-arm-static -v ${workdir}/extras/qemu-aarch64-static:/usr/bin/qemu-aarch64-static -h ${dockername} --name ${dockername} -e DOCKER_WORKDIR=${dockerdir} forumi0721alpinex64/alpine-x64-dev:latest - "${@}"
 	[ "${DEBUG}" = "Y" ] && set +x
 }
 
@@ -106,7 +106,7 @@ fn_make_alpine() {
 	#qemu
 	if [ ! -z "${TARGET_QEMU}" ]; then
 		mkdir -p ${TARGET_OUTPUT}/usr/bin
-		cp extra/${TARGET_QEMU} ${TARGET_OUTPUT}/usr/bin/
+		cp extras/${TARGET_QEMU} ${TARGET_OUTPUT}/usr/bin/
 	fi
 	local APK_VERSION="$(wget -q -O - ${ALPINE_MIRROR}/${ALPINE_DIST}/main/${ALPINE_ARCH}/APKINDEX.tar.gz | tar -Oxz | grep --text '^P:apk-tools-static$' -A1 | tail -n1 | cut -d: -f2)"
 	wget -q -O - ${ALPINE_MIRROR}/${ALPINE_DIST}/main/${ALPINE_ARCH}/apk-tools-static-${APK_VERSION}.apk | tar -xz -C "${TARGET_OUTPUT}" sbin/apk.static  2>/dev/null
@@ -205,9 +205,140 @@ fn_make_entware() {
 	wget "${busybox}" -q -O - | tar zxf - -C ${TARGET_OUTPUT}/
 	rm -rf ${TARGET_OUTPUT}/.PKGINFO ${TARGET_OUTPUT}/.SIGN.RSA*
 	#qemu
+	mkdir -p ${TARGET_OUTPUT}/bin ${TARGET_OUTPUT}/sbin ${TARGET_OUTPUT}/usr/bin ${TARGET_OUTPUT}/usr/sbin ${TARGET_OUTPUT}/usr/local/bin ${TARGET_OUTPUT}/usr/local/sbin
 	if [ ! -z "${TARGET_QEMU}" ]; then
 		mkdir -p ${TARGET_OUTPUT}/usr/bin
-		cp extra/${TARGET_QEMU} ${TARGET_OUTPUT}/usr/bin/
+		cp extras/${TARGET_QEMU} ${TARGET_OUTPUT}/usr/bin/
+	fi
+
+	#if [ ! -z "${TARGET_QEMU}" ]; then
+	#	QEMU_EXECVE=1 PATH="/opt/sbin:/opt/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/busybox.static --install -s
+	#else
+	#	chroot ${TARGET_OUTPUT} /bin/busybox.static --install -s
+	#fi
+	ln -s /bin/busybox.static ${TARGET_OUTPUT}/bin/sh
+	ln -s /bin/busybox.static ${TARGET_OUTPUT}/bin/wget
+	ln -s /bin/busybox.static ${TARGET_OUTPUT}/bin/mkdir
+	ln -s /bin/busybox.static ${TARGET_OUTPUT}/bin/chmod
+	ln -s /bin/busybox.static ${TARGET_OUTPUT}/bin/ln
+
+	#Create basic directory
+	for folder in dev etc root home proc run sys tmp var
+	do
+		mkdir -p ${TARGET_OUTPUT}/${folder}
+	done
+
+	#resolve
+	cat << EOF > ${TARGET_OUTPUT}/etc/resolv.conf
+nameserver 1.1.1.1
+nameserver 1.0.0.1
+EOF
+
+	#Intall entware
+	wget http://bin.entware.net/${ENTWARE_VER}/installer/generic.sh -q -O ${TARGET_OUTPUT}/entware_install.sh
+	sed -i -e 's|/opt/bin/opkg install entware-opt|#/opt/bin/opkg install entware-opt|g' ${TARGET_OUTPUT}/entware_install.sh
+	sed -i -e 's|chmod 777 /opt/tmp|chmod 777 /opt/tmp\nexit 0|g' ${TARGET_OUTPUT}/entware_install.sh
+	
+	if [ ! -z "${TARGET_QEMU}" ]; then
+		QEMU_EXECVE=1 PATH="/opt/sbin:/opt/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "/bin/sh /entware_install.sh ; /opt/bin/opkg install opkg busybox"
+	else
+		chroot "${TARGET_OUTPUT}" /bin/sh -c "/bin/sh /entware_install.sh ; /opt/bin/opkg install opkg busybox"
+	fi
+	if [ "${TARGET_ARCH}" = "armhf" ]; then
+		ln -s ld-2.27.so ${TARGET_OUTPUT}/lib/ld-linux-armhf.so.3
+	fi
+	rm -rf ${TARGET_OUTPUT}/entware_install.sh
+	rm -rf ${TARGET_OUTPUT}/bin ${TARGET_OUTPUT}/sbin ${TARGET_OUTPUT}/lib
+	ln -s opt/bin ${TARGET_OUTPUT}/bin
+	ln -s opt/sbin ${TARGET_OUTPUT}/sbin
+	ln -s opt/lib ${TARGET_OUTPUT}/lib
+	if [ "${TARGET_ARCH}" = "x64" ]; then
+		ln -s opt/lib ${TARGET_OUTPUT}/lib64
+	fi
+	if [ ! -z "${TARGET_QEMU}" ]; then
+		QEMU_EXECVE=1 PATH="/opt/sbin:/opt/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "/opt/bin/opkg update ; /opt/bin/opkg download entware-ng"
+	else
+		chroot "${TARGET_OUTPUT}" /bin/sh -c "/opt/bin/opkg update ; /opt/bin/opkg download entware-opt"
+	fi
+	tar zxf ${TARGET_OUTPUT}/entware-opt* -C ${TARGET_OUTPUT}/
+	tar zxf ${TARGET_OUTPUT}/data.tar.gz -C ${TARGET_OUTPUT}/
+	rm -rf ${TARGET_OUTPUT}/entware-opt* ${TARGET_OUTPUT}/debian-binary ${TARGET_OUTPUT}/data.tar.gz ${TARGET_OUTPUT}/control.tar.gz
+
+	#Link directory
+	mkdir -p ${TARGET_OUTPUT}/usr/bin ${TARGET_OUTPUT}/usr/sbin ${TARGET_OUTPUT}/usr/local/bin ${TARGET_OUTPUT}/usr/local/sbin
+	if [ ! -z "${TARGET_QEMU}" ]; then
+		mkdir -p ${TARGET_OUTPUT}/usr/bin
+		cp extras/${TARGET_QEMU} ${TARGET_OUTPUT}/usr/bin/
+	fi
+	rm -rf ${TARGET_OUTPUT}/etc
+	cp -r ${TARGET_OUTPUT}/opt/etc ${TARGET_OUTPUT}/etc
+	mv ${TARGET_OUTPUT}/etc/shells.1 ${TARGET_OUTPUT}/etc/shells
+	rm -rf ${TARGET_OUTPUT}/etc/*.1 ${TARGET_OUTPUT}/opt/etc/*.1
+	cat << EOF > ${TARGET_OUTPUT}/etc/passwd
+root::0:0:Root:/root:/opt/bin/sh
+nobody:x:99:99::/opt/home:/opt/bin/false
+EOF
+	cat << EOF > ${TARGET_OUTPUT}/etc/group
+root:x:0:root
+nobody:x:98:nobody
+nogroup:x:99:
+users:x:100:
+EOF
+	cp -ar ${TARGET_OUTPUT}/opt/etc/skel/. ${TARGET_OUTPUT}/root/
+	ln -sf /etc/passwd ${TARGET_OUTPUT}/opt/etc/passwd
+	ln -sf /etc/group ${TARGET_OUTPUT}/opt/etc/group
+	ln -sf /etc/shells ${TARGET_OUTPUT}/opt/etc/shells
+	if [ -e "/etc/zoneinfo/${TARGET_TIMEZONE}" ]; then
+		cat "/etc/zoneinfo/${TARGET_TIMEZONE}" > ${TARGET_OUTPUT}/etc/localtime
+	elif [ -e /etc/localtime ]; then
+		cat /etc/localtime/${TARGET_OUTPUT}/etc/localtime
+	fi
+	if [ -e ${TARGET_OUTPUT}/etc/localtime ]; then
+		ln -s /etc/localtime ${TARGET_OUTPUT}/opt/etc/localtime
+	fi
+
+	#resolve
+	cat << EOF > ${TARGET_OUTPUT}/etc/resolv.conf
+nameserver 1.1.1.1
+nameserver 1.0.0.1
+EOF
+
+	echo "Clearing"
+
+	rm -rf ${TARGET_OUTPUT}/opt/tmp/opkg-*
+	rm -rf ${TARGET_OUTPUT}/tmp/*
+
+	echo
+
+	fn_make_common
+}
+
+fn_make_entware_normal() {
+	echo "Bootstrap"
+
+	local ENTWARE_VER=
+	if [ "${TARGET_ARCH}" = "x64" ]; then
+		ENTWARE_VER="$(wget http://bin.entware.net/ -q -O - | grep 'x64-' | tail -1 | sed -e 's/^.*a href="\([^"]*\)\/".*$/\1/g')"
+	elif [ "${TARGET_ARCH}" = "aarch64" ]; then
+		ENTWARE_VER="$(wget http://bin.entware.net/ -q -O - | grep 'aarch64-' | tail -1 | sed -e 's/^.*a href="\([^"]*\)\/".*$/\1/g')"
+	elif [ "${TARGET_ARCH}" = "armhf" ]; then
+		ENTWARE_VER="$(wget http://bin.entware.net/ -q -O - | grep 'armv7sf-' | tail -1 | sed -e 's/^.*a href="\([^"]*\)\/".*$/\1/g')"
+	fi
+
+	# Need busbox for bootstrapping
+	local ALPINE_ARCH=${TARGET_ARCH}
+	ALPINE_ARCH=${ALPINE_ARCH/x64/x86_64}
+	ALPINE_ARCH=${ALPINE_ARCH/armv7h/armv7}
+	ALPINE_ARCH=${ALPINE_ARCH/armhf/armv7}
+	ALPINE_ARCH=${ALPINE_ARCH/aarch64/aarch64}
+
+	local busybox="https://mirror.xtom.com.hk/alpine/edge/main/${ALPINE_ARCH}/$(wget https://mirror.xtom.com.hk/alpine/edge/main/${ALPINE_ARCH}/ -q -O - | grep busybox-static | sed -e 's/^.*href="\([^"]*\)".*$/\1/g')"
+	wget "${busybox}" -q -O - | tar zxf - -C ${TARGET_OUTPUT}/
+	rm -rf ${TARGET_OUTPUT}/.PKGINFO ${TARGET_OUTPUT}/.SIGN.RSA*
+	#qemu
+	if [ ! -z "${TARGET_QEMU}" ]; then
+		mkdir -p ${TARGET_OUTPUT}/usr/bin
+		cp extras/${TARGET_QEMU} ${TARGET_OUTPUT}/usr/bin/
 	fi
 
 	if [ ! -z "${TARGET_QEMU}" ]; then
@@ -274,7 +405,7 @@ EOF
 	fi
 	if [ ! -z "${TARGET_QEMU}" ]; then
 		mkdir -p ${TARGET_OUTPUT}/usr/bin
-		cp extra/${TARGET_QEMU} ${TARGET_OUTPUT}/usr/bin/
+		cp extras/${TARGET_QEMU} ${TARGET_OUTPUT}/usr/bin/
 	fi
 	rm -rf ${TARGET_OUTPUT}/etc
 	cp -r ${TARGET_OUTPUT}/opt/etc ${TARGET_OUTPUT}/etc
@@ -413,7 +544,7 @@ EOF
 	#qemu
 	if [ ! -z "${TARGET_QEMU}" ]; then
 		mkdir -p ${TARGET_OUTPUT}/usr/bin
-		cp extra/${TARGET_QEMU} ${TARGET_OUTPUT}/usr/bin/
+		cp extras/${TARGET_QEMU} ${TARGET_OUTPUT}/usr/bin/
 	fi
 
 	if [ "${TARGET_ARCH}" = "armhf" ] || [ "${TARGET_ARCH}" = "aarch64" ]; then
@@ -496,9 +627,9 @@ EOF
 	cp -ar ${TARGET_OUTPUT}/etc/skel/. ${TARGET_OUTPUT}/root/
 
 	#yaourt
-	if [ -e extra/package-query-*-${ARCH_ARCH}.pkg.tar.xz -a -e extra/yaourt-*-any.pkg.tar.xz ]; then
-		cp extra/package-query-*-${ARCH_ARCH}.pkg.tar.xz ${TARGET_OUTPUT}/
-		cp extra/yaourt-*-any.pkg.tar.xz ${TARGET_OUTPUT}/
+	if [ -e extras/package-query-*-${ARCH_ARCH}.pkg.tar.xz -a -e extras/yaourt-*-any.pkg.tar.xz ]; then
+		cp extras/package-query-*-${ARCH_ARCH}.pkg.tar.xz ${TARGET_OUTPUT}/
+		cp extras/yaourt-*-any.pkg.tar.xz ${TARGET_OUTPUT}/
 		if [ "${TARGET_ARCH}" = "armhf" ] || [ "${TARGET_ARCH}" = "aarch64" ]; then
 			QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "/usr/bin/pacman -Sy --noconfirm ; /usr/bin/pacman -U --noconfirm --asdeps /package-query-*; /usr/bin/pacman -U --noconfirm /yaourt-*-any.pkg.tar.xz"
 		else
@@ -606,7 +737,7 @@ fn_make_debian_common() {
 
 	if [ ! -z "${TARGET_QEMU}" ]; then
 		mkdir -p "${TARGET_OUTPUT}/usr/bin"
-		cp extra/${TARGET_QEMU} ${TARGET_OUTPUT}/usr/bin/
+		cp extras/${TARGET_QEMU} ${TARGET_OUTPUT}/usr/bin/
 
 		echo "debootstrap 1st"
 		PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true debootstrap --foreign ${DEBIAN_OPTION[@]} ${DEBIAN_DIST} "${TARGET_OUTPUT}" ${DEBIAN_MIRROR}
@@ -788,7 +919,7 @@ EOF
 
 	#qemu
 	if [ ! -z "${TARGET_QEMU}" ]; then
-		cp -f extra/${TARGET_QEMU} "${TARGET_OUTPUT}/usr/bin/"
+		cp -f extras/${TARGET_QEMU} "${TARGET_OUTPUT}/usr/bin/"
 	fi
 
 	if [ -e ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8 ]; then
@@ -799,108 +930,111 @@ EOF
 	fi
 
 	#docker-run
-	cp extra/docker-run ${TARGET_OUTPUT}/usr/local/bin/docker-run
+	cp extras/docker-run ${TARGET_OUTPUT}/usr/local/bin/docker-run
 	
 	#docker-install
 	if [ -e "${TARGET_OUTPUT}/etc/alpine-release" ]; then
-		cp -f extra/docker-install.alpine ${TARGET_OUTPUT}/usr/local/bin/docker-install
+		cp -f extras/docker-install.alpine ${TARGET_OUTPUT}/usr/local/bin/docker-install
 	elif [ -e "${TARGET_OUTPUT}/opt/bin/opkg" ]; then
-		cp -f extra/docker-install.entware ${TARGET_OUTPUT}/usr/local/bin/docker-install
+		cp -f extras/docker-install.entware ${TARGET_OUTPUT}/usr/local/bin/docker-install
 	elif [ -e "${TARGET_OUTPUT}/etc/arch-release" ]; then
 		mount -o bind "${TARGET_OUTPUT}" "${TARGET_OUTPUT}"
-		cp -f extra/docker-install.arch ${TARGET_OUTPUT}/usr/local/bin/docker-install
+		cp -f extras/docker-install.arch ${TARGET_OUTPUT}/usr/local/bin/docker-install
 		rm -rf ${TARGET_OUTPUT}/usr/local/bin/docker-sysusers ${TARGET_OUTPUT}/usr/local/bin/docker-tmpfiles
-		#cp extra/docker-sysusers ${TARGET_OUTPUT}/usr/local/bin/
-		#cp extra/docker-tmpfiles ${TARGET_OUTPUT}/usr/local/bin/
+		#cp extras/docker-sysusers ${TARGET_OUTPUT}/usr/local/bin/
+		#cp extras/docker-tmpfiles ${TARGET_OUTPUT}/usr/local/bin/
 		mount -o bind ${TARGET_OUTPUT} ${TARGET_OUTPUT}
 	elif [ -e "${TARGET_OUTPUT}/etc/os-release" -a ! -z "$(grep "ID=\(debian\|ubuntu\)" "${TARGET_OUTPUT}/etc/os-release")" ]; then
-		cp -f extra/docker-install.deb ${TARGET_OUTPUT}/usr/local/bin/docker-install
+		cp -f extras/docker-install.deb ${TARGET_OUTPUT}/usr/local/bin/docker-install
 	fi
 	rm -rf ${TARGET_OUTPUT}/usr/local/bin/docker-su
-	#cp extra/docker-su ${TARGET_OUTPUT}/usr/local/bin/docker-su
+	#cp extras/docker-su ${TARGET_OUTPUT}/usr/local/bin/docker-su
 
 	#docker-build
 	if [ "${TARGET_ARCH}" = "armhf" ]; then
-		cp -f extra/docker-build-arm "${TARGET_OUTPUT}/usr/local/bin/"
+		cp -f extras/docker-build-arm "${TARGET_OUTPUT}/usr/local/bin/"
 		ln -sf docker-build-arm "${TARGET_OUTPUT}/usr/local/bin/docker-build-start"
 		ln -sf docker-build-arm "${TARGET_OUTPUT}/usr/local/bin/docker-build-end"
 		rm -rf ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check
 		rm -rf ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check.sh
 		#if [ -e ${TARGET_OUTPUT}/lib/ld-musl-armhf.so.1 ]; then
-		#	cp extra/docker-execve-check.armv7h.musl ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check
+		#	cp extras/docker-execve-check.armv7h.musl ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check
 		#else
-		#	cp extra/docker-execve-check.armv7h.glibc ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check
+		#	cp extras/docker-execve-check.armv7h.glibc ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check
 		#fi
-		#cp extra/docker-execve-check.sh ${TARGET_OUTPUT}/usr/local/bin/
+		#cp extras/docker-execve-check.sh ${TARGET_OUTPUT}/usr/local/bin/
 	elif [ "${TARGET_ARCH}" = "aarch64" ]; then
-		cp -f extra/docker-build-aarch64 "${TARGET_OUTPUT}/usr/local/bin/"
+		cp -f extras/docker-build-aarch64 "${TARGET_OUTPUT}/usr/local/bin/"
 		ln -sf docker-build-aarch64 "${TARGET_OUTPUT}/usr/local/bin/docker-build-start"
 		ln -sf docker-build-aarch64 "${TARGET_OUTPUT}/usr/local/bin/docker-build-end"
 		rm -rf ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check
 		rm -rf ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check.sh
 		#if [ -e ${TARGET_OUTPUT}/lib/ld-musl-aarch64.so.1 ]; then
-		#	cp extra/docker-execve-check.aarch64.musl ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check
+		#	cp extras/docker-execve-check.aarch64.musl ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check
 		#else
-		#	cp extra/docker-execve-check.aarch64.glibc ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check
+		#	cp extras/docker-execve-check.aarch64.glibc ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check
 		#fi
-		#cp extra/docker-execve-check.sh ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check.sh
+		#cp extras/docker-execve-check.sh ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check.sh
 	else
-		cp -f extra/docker-build-x64 "${TARGET_OUTPUT}/usr/local/bin/docker-build"
+		cp -f extras/docker-build-x64 "${TARGET_OUTPUT}/usr/local/bin/docker-build"
 		ln -sf docker-build "${TARGET_OUTPUT}/usr/local/bin/docker-build-start"
 		ln -sf docker-build "${TARGET_OUTPUT}/usr/local/bin/docker-build-end"
 		rm -rf ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check
-		#cp extra/docker-execve-check.sh ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check
+		#cp extras/docker-execve-check.sh ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check
 	fi
 
 	#docker-adduser
-	cp -f extra/docker-adduser ${TARGET_OUTPUT}/usr/local/bin/docker-adduser
+	cp -f extras/docker-adduser ${TARGET_OUTPUT}/usr/local/bin/docker-adduser
 
 	#docker-chown
-	cp -f extra/docker-chown ${TARGET_OUTPUT}/usr/local/bin/docker-chown
+	cp -f extras/docker-chown ${TARGET_OUTPUT}/usr/local/bin/docker-chown
+
+	#docker-download
+	cp -f extras/docker-download ${TARGET_OUTPUT}/usr/local/bin/docker-download
 
 	#su-exec
-	#rm -rf ${TARGET_OUTPUT}/usr/local/bin/su-exec
-	if [ "${TARGET_ARCH}" = "armhf" ]; then
-		if [ -e ${TARGET_OUTPUT}/lib/ld-musl-armhf.so.1 ]; then
-			cp extra/su-exec-musl-armv7h ${TARGET_OUTPUT}/usr/local/bin/su-exec
-		else
-			cp extra/su-exec-glibc-armv7h ${TARGET_OUTPUT}/usr/local/bin/su-exec
-		fi
-	elif [ "${TARGET_ARCH}" = "aarch64" ]; then
-		if [ -e ${TARGET_OUTPUT}/lib/ld-musl-aarch64.so.1 ]; then
-			cp extra/su-exec-musl-aarch64 ${TARGET_OUTPUT}/usr/local/bin/su-exec
-		else
-			cp extra/su-exec-glibc-aarch64 ${TARGET_OUTPUT}/usr/local/bin/su-exec
-		fi
-	else
-		if [ -e ${TARGET_OUTPUT}/lib/ld-musl-x86_64.so.1 ]; then
-			cp extra/su-exec-musl-x64 ${TARGET_OUTPUT}/usr/local/bin/su-exec
-		else
-			cp extra/su-exec-glibc-x64 ${TARGET_OUTPUT}/usr/local/bin/su-exec
-		fi
-	fi
+	rm -rf ${TARGET_OUTPUT}/usr/local/bin/su-exec
+	#if [ "${TARGET_ARCH}" = "armhf" ]; then
+	#	if [ -e ${TARGET_OUTPUT}/lib/ld-musl-armhf.so.1 ]; then
+	#		cp extras/su-exec-musl-armv7h ${TARGET_OUTPUT}/usr/local/bin/su-exec
+	#	else
+	#		cp extras/su-exec-glibc-armv7h ${TARGET_OUTPUT}/usr/local/bin/su-exec
+	#	fi
+	#elif [ "${TARGET_ARCH}" = "aarch64" ]; then
+	#	if [ -e ${TARGET_OUTPUT}/lib/ld-musl-aarch64.so.1 ]; then
+	#		cp extras/su-exec-musl-aarch64 ${TARGET_OUTPUT}/usr/local/bin/su-exec
+	#	else
+	#		cp extras/su-exec-glibc-aarch64 ${TARGET_OUTPUT}/usr/local/bin/su-exec
+	#	fi
+	#else
+	#	if [ -e ${TARGET_OUTPUT}/lib/ld-musl-x86_64.so.1 ]; then
+	#		cp extras/su-exec-musl-x64 ${TARGET_OUTPUT}/usr/local/bin/su-exec
+	#	else
+	#		cp extras/su-exec-glibc-x64 ${TARGET_OUTPUT}/usr/local/bin/su-exec
+	#	fi
+	#fi
 
 	#goreman
-	#rm -rf ${TARGET_OUTPUT}/usr/local/bin/goreman
-	if [ "${TARGET_ARCH}" = "armhf" ]; then
-		if [ -e ${TARGET_OUTPUT}/lib/ld-musl-armhf.so.1 ]; then
-			cp extra/goreman-musl-armv7h ${TARGET_OUTPUT}/usr/local/bin/goreman
-		else
-			cp extra/goreman-glibc-armv7h ${TARGET_OUTPUT}/usr/local/bin/goreman
-		fi
-	elif [ "${TARGET_ARCH}" = "aarch64" ]; then
-		if [ -e ${TARGET_OUTPUT}/lib/ld-musl-aarch64.so.1 ]; then
-			cp extra/goreman-musl-aarch64 ${TARGET_OUTPUT}/usr/local/bin/goreman
-		else
-			cp extra/goreman-glibc-aarch64 ${TARGET_OUTPUT}/usr/local/bin/goreman
-		fi
-	else
-		if [ -e ${TARGET_OUTPUT}/lib/ld-musl-x86_64.so.1 ]; then
-			cp extra/goreman-musl-x64 ${TARGET_OUTPUT}/usr/local/bin/goreman
-		else
-			cp extra/goreman-glibc-x64 ${TARGET_OUTPUT}/usr/local/bin/goreman
-		fi
-	fi
+	rm -rf ${TARGET_OUTPUT}/usr/local/bin/goreman
+	#if [ "${TARGET_ARCH}" = "armhf" ]; then
+	#	if [ -e ${TARGET_OUTPUT}/lib/ld-musl-armhf.so.1 ]; then
+	#		cp extras/goreman-musl-armv7h ${TARGET_OUTPUT}/usr/local/bin/goreman
+	#	else
+	#		cp extras/goreman-glibc-armv7h ${TARGET_OUTPUT}/usr/local/bin/goreman
+	#	fi
+	#elif [ "${TARGET_ARCH}" = "aarch64" ]; then
+	#	if [ -e ${TARGET_OUTPUT}/lib/ld-musl-aarch64.so.1 ]; then
+	#		cp extras/goreman-musl-aarch64 ${TARGET_OUTPUT}/usr/local/bin/goreman
+	#	else
+	#		cp extras/goreman-glibc-aarch64 ${TARGET_OUTPUT}/usr/local/bin/goreman
+	#	fi
+	#else
+	#	if [ -e ${TARGET_OUTPUT}/lib/ld-musl-x86_64.so.1 ]; then
+	#		cp extras/goreman-musl-x64 ${TARGET_OUTPUT}/usr/local/bin/goreman
+	#	else
+	#		cp extras/goreman-glibc-x64 ${TARGET_OUTPUT}/usr/local/bin/goreman
+	#	fi
+	#fi
 
 	if [ -e ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8 ]; then
 		rm -rf ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8
@@ -1249,7 +1383,7 @@ fi
 #		if [ -e /proc/sys/fs/binfmt_misc/register ]; then
 #			if [ "${TARGET_ARCH}" = "armhf" ]; then
 #				if [ ! -e /usr/bin/qemu-arm-static ]; then
-#					cp extra/qemu-arm-static /usr/bin/qemu-arm-static
+#					cp extras/qemu-arm-static /usr/bin/qemu-arm-static
 #				fi
 #				if [ ! -e /proc/sys/fs/binfmt_misc/arm -a -e /usr/bin/qemu-arm-static ]; then
 #					echo ':arm:M::\x7fELF\x01\x01\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02\x00\x28\x00:\xff\xff\xff\xff\xff\xff\xff\x00\xff\xff\xff\xff\xff\xff\xff\xff\xfe\xff\xff\xff:/usr/bin/qemu-arm-static:' > /proc/sys/fs/binfmt_misc/register
@@ -1258,7 +1392,7 @@ fi
 #
 #			if [ "${TARGET_ARCH}" = "aarch64" ]; then
 #				if [ ! -e /usr/bin/qemu-aarch64-static ]; then
-#					cp extra/qemu-aarch64-static /usr/bin/qemu-aarch64-static
+#					cp extras/qemu-aarch64-static /usr/bin/qemu-aarch64-static
 #				fi
 #				if [ ! -e /proc/sys/fs/binfmt_misc/aarch64 -a -e /usr/bin/qemu-aarch64-static ]; then
 #					echo ':aarch64:M::\x7fELF\x02\x01\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02\x00\xb7\x00:\xff\xff\xff\xff\xff\xff\xff\x00\xff\xff\xff\xff\xff\xff\xff\xff\xfe\xff\xff\xff:/usr/bin/qemu-aarch64-static:' > /proc/sys/fs/binfmt_misc/register
