@@ -10,8 +10,6 @@ do
 	if [ "${dist}" = "ubuntu" ]; then
 		echo "${dist} x64-bionic"
 		docker pull forumi0721/ubnutu-x64-base-bionic
-		echo "${dist} x64-xenial"
-		docker pull forumi0721/ubnutu-x64-base-xenial
 	fi
 done
 

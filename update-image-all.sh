@@ -10,8 +10,6 @@ do
 	if [ "${dist}" = "ubuntu" ]; then
 		echo "${dist} x64-bionic"
 		./image.sh -d ubuntu -a x64 -e bionic -u -q -v $@
-		echo "${dist} x64-xenial"
-		./image.sh -d ubuntu -a x64 -e xenial -u -q -v $@
 	fi
 done
 
