@@ -184,6 +184,7 @@ EOF
 
 fn_make_entware() {
 	echo "Bootstrap"
+	local USE_LOCALE=N
 
 	local ENTWARE_VER=
 	if [ "${TARGET_ARCH}" = "x64" ]; then
@@ -238,11 +239,11 @@ EOF
 	wget http://bin.entware.net/${ENTWARE_VER}/installer/generic.sh -q -O ${TARGET_OUTPUT}/entware_install.sh
 	sed -i -e 's|/opt/bin/opkg install entware-opt|#/opt/bin/opkg install entware-opt|g' ${TARGET_OUTPUT}/entware_install.sh
 	sed -i -e 's|chmod 777 /opt/tmp|chmod 777 /opt/tmp\nexit 0|g' ${TARGET_OUTPUT}/entware_install.sh
-	
+
 	if [ ! -z "${TARGET_QEMU}" ]; then
-		QEMU_EXECVE=1 PATH="/opt/sbin:/opt/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "/bin/sh /entware_install.sh ; /opt/bin/opkg install opkg busybox"
+		QEMU_EXECVE=1 PATH="/opt/sbin:/opt/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "/bin/sh /entware_install.sh ; /opt/bin/opkg install opkg busybox entware-release"
 	else
-		chroot "${TARGET_OUTPUT}" /bin/sh -c "/bin/sh /entware_install.sh ; /opt/bin/opkg install opkg busybox"
+		chroot "${TARGET_OUTPUT}" /bin/sh -c "/bin/sh /entware_install.sh ; /opt/bin/opkg install opkg busybox entware-release"
 	fi
 	rm -rf ${TARGET_OUTPUT}/entware_install.sh
 	rm -rf ${TARGET_OUTPUT}/bin ${TARGET_OUTPUT}/sbin ${TARGET_OUTPUT}/lib
@@ -284,10 +285,14 @@ nobody:x:98:nobody
 nogroup:x:99:
 users:x:100:
 EOF
+	sed -i -e 's/^export LANG=/#export LANG=/g' -e 's/^export LC_ALL=/#export LC_ALL=/g' ${TARGET_OUTPUT}/etc/profile
+	echo >> ${TARGET_OUTPUT}/etc/profile
+	echo "export LD_LIBRARY_PATH=/opt/lib" >> ${TARGET_OUTPUT}/etc/profile
 	cp -ar ${TARGET_OUTPUT}/opt/etc/skel/. ${TARGET_OUTPUT}/root/
 	ln -sf /etc/passwd ${TARGET_OUTPUT}/opt/etc/passwd
 	ln -sf /etc/group ${TARGET_OUTPUT}/opt/etc/group
 	ln -sf /etc/shells ${TARGET_OUTPUT}/opt/etc/shells
+	ln -sf /etc/profile ${TARGET_OUTPUT}/opt/etc/profile
 	if [ -e "/etc/zoneinfo/${TARGET_TIMEZONE}" ]; then
 		cat "/etc/zoneinfo/${TARGET_TIMEZONE}" > ${TARGET_OUTPUT}/etc/localtime
 	elif [ -e /etc/localtime ]; then
@@ -302,6 +307,46 @@ EOF
 nameserver 1.1.1.1
 nameserver 1.0.0.1
 EOF
+
+	#Locales
+	if [ "${USE_LOCALE}" = "Y" ]; then
+		#Ignore locales
+		mkdir --p ${TARGET_OUTPUT}/opt/usr/lib/locale
+		touch ${TARGET_OUTPUT}/opt/usr/lib/locale/locale-archive
+
+		if [ ! -z "${TARGET_QEMU}" ]; then
+			QEMU_EXECVE=1 PATH="/opt/sbin:/opt/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "/opt/bin/opkg install locales"
+		else
+			chroot "${TARGET_OUTPUT}" /bin/sh -c "/opt/bin/opkg install locales"
+		fi
+		rm -rf ${TARGET_OUTPUT}/opt/usr/lib/locale/locale-archive
+		mkdir -p ${TARGET_OUTPUT}/locales
+		wget http://pkg.entware.net/sources/i18n_glib227.tar.gz -q -O - | tar zxf - -C ${TARGET_OUTPUT}/locales/
+		cp ${TARGET_OUTPUT}/locales/i18n/locales/translit_hangul ${TARGET_OUTPUT}/opt/usr/share/i18n/locales/translit_hangul
+		cp ${TARGET_OUTPUT}/locales/i18n/locales/ko_KR ${TARGET_OUTPUT}/opt/usr/share/i18n/locales/ko_KR
+		cp ${TARGET_OUTPUT}/locales/i18n/charmaps/EUC-KR.gz ${TARGET_OUTPUT}/opt/usr/share/i18n/charmaps/EUC-KR.gz
+		gzip -dc ${TARGET_OUTPUT}/locales/i18n/charmaps/EUC-KR.gz > ${TARGET_OUTPUT}/opt/usr/share/i18n/charmaps/EUC-KR
+		cp ${TARGET_OUTPUT}/locales/i18n/charmaps/KSC5636.gz ${TARGET_OUTPUT}/opt/usr/share/i18n/charmaps/KSC5636.gz
+		gzip -dc ${TARGET_OUTPUT}/locales/i18n/charmaps/KSC5636.gz > ${TARGET_OUTPUT}/opt/usr/share/i18n/charmaps/KSC5636
+		cp ${TARGET_OUTPUT}/locales/i18n/charmaps/CP949.gz ${TARGET_OUTPUT}/opt/usr/share/i18n/charmaps/CP949.gz
+		gzip -dc ${TARGET_OUTPUT}/locales/i18n/charmaps/CP949.gz > ${TARGET_OUTPUT}/opt/usr/share/i18n/charmaps/CP949
+		rm -rf ${TARGET_OUTPUT}/locales
+		if [ ! -z "${TARGET_QEMU}" ]; then
+			QEMU_EXECVE=1 PATH="/opt/sbin:/opt/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /opt/bin/localedef.new -c -f UTF-8 -i en_US en_US.UTF-8
+			if [ ! -z "${TARGET_LOCALE}" -a "${TARGET_LOCALE}" != "en_US.UTF-8" ]; then
+				local l1="$(echo "${TARGET_LOCALE}" | cut -d '.' -f 1)"
+				local l2="$(echo "${TARGET_LOCALE}" | cut -d '.' -f 2)"
+				QEMU_EXECVE=1 PATH="/opt/sbin:/opt/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /opt/bin/localedef.new -c -f ${l2} -i ${l1} ${l1}.${l2}
+			fi
+		else
+			chroot "${TARGET_OUTPUT}" /opt/bin/localedef.new -c -f UTF-8 -i en_US en_US.UTF-8
+			if [ ! -z "${TARGET_LOCALE}" -a "${TARGET_LOCALE}" != "en_US.UTF-8" ]; then
+				local l1="$(echo "${TARGET_LOCALE}" | cut -d '.' -f 1)"
+				local l2="$(echo "${TARGET_LOCALE}" | cut -d '.' -f 2)"
+				chroot "${TARGET_OUTPUT}" /opt/bin/localedef.new -c -f ${l2} -i ${l1} ${l1}.${l2}
+			fi
+		fi
+	fi
 
 	echo "Clearing"
 
@@ -384,7 +429,7 @@ EOF
 		ln -sf /opt/bin/busybox ${TARGET_OUTPUT}/opt/bin/${bb}
 	done
 	rm -rf ${TARGET_OUTPUT}/bin/*
-	
+
 	#Link directory
 	for x in $(ls ${TARGET_OUTPUT}/opt/)
 	do
@@ -859,7 +904,7 @@ EOF
 		force-unsafe-io
 		EOF
 	fi
-	
+
 	if [ -d "${TARGET_OUTPUT}/etc/apt/apt.conf.d" ]; then
 		# _keep_ us lean by effectively running "apt-get clean" after every install
 		aptGetClean='"rm -f /var/cache/apt/archives/*.deb /var/cache/apt/archives/partial/*.deb /var/cache/apt/*.bin || true";'
@@ -931,7 +976,7 @@ EOF
 
 	#docker-run
 	cp extras/docker-run ${TARGET_OUTPUT}/usr/local/bin/docker-run
-	
+
 	#docker-install
 	if [ -e "${TARGET_OUTPUT}/etc/alpine-release" ]; then
 		cp -f extras/docker-install.alpine ${TARGET_OUTPUT}/usr/local/bin/docker-install
@@ -990,7 +1035,8 @@ EOF
 	cp -f extras/docker-chown ${TARGET_OUTPUT}/usr/local/bin/docker-chown
 
 	#docker-download
-	cp -f extras/docker-download ${TARGET_OUTPUT}/usr/local/bin/docker-download
+	rm -rf ${TARGET_OUTPUT}/usr/local/bin/docker-download
+	#cp -f extras/docker-download ${TARGET_OUTPUT}/usr/local/bin/docker-download
 
 	#su-exec
 	rm -rf ${TARGET_OUTPUT}/usr/local/bin/su-exec

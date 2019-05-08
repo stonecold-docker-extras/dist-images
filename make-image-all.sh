@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
-for dist in arch entware debian ubuntu alpine
+for dist in debian ubuntu alpine entware
 do
-	for arch in x64 armhf aarch64
+	for arch in x64 aarch64 armhf
 	do
 		echo "${dist} ${arch}"
 		./image.sh -d "${dist}" -a "${arch}" -m -q -v $@
