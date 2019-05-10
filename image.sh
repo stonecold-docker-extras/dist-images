@@ -346,6 +346,17 @@ EOF
 				chroot "${TARGET_OUTPUT}" /opt/bin/localedef.new -c -f ${l2} -i ${l1} ${l1}.${l2}
 			fi
 		fi
+	else
+		#Ignore locales
+		mkdir --p ${TARGET_OUTPUT}/opt/usr/lib/locale
+		touch ${TARGET_OUTPUT}/opt/usr/lib/locale/locale-archive
+
+		if [ ! -z "${TARGET_QEMU}" ]; then
+			QEMU_EXECVE=1 PATH="/opt/sbin:/opt/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "/opt/bin/opkg install locales ; rm -rf /opt/usr/lib/locale/locale-archive ; /opt/bin/localedef.new -c -f UTF-8 -i en_US en_US.UTF-8 ; /opt/bin/opkg remove locales --autoremove"
+		else
+			chroot "${TARGET_OUTPUT}" /bin/sh -c "/opt/bin/opkg install locales ; rm -rf /opt/usr/lib/locale/locale-archive ; /opt/bin/localedef.new -c -f UTF-8 -i en_US en_US.UTF-8 ; /opt/bin/opkg remove locales --autoremove"
+
+		fi
 	fi
 
 	echo "Clearing"
