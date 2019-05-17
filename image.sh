@@ -49,7 +49,7 @@ fn_run_docker() {
 
 fn_usage() {
 	echo "Usage : $(basename "${0}") [-d distro] [-a architecture] [-o output] [-l locale] [-z timezone] [--include include packages] [--exclud exclude pacakges] [-m] [-s] [-i] [-p] [-q]"
-	echo "          [-d distro] : arch,alpine,debian,entware,ubuntu (default : arch)"
+	echo "          [-d distro] : alpine,debian,ubuntu,entware,busybox,arch"
 	echo "          [-a architecture] : x64(x86_64),armv7h(armhf),aarch64(arm64) (default : x64)"
 	echo "          [-e edition] : debian, ubuntu option"
 	echo "          [-o output] : output dir (default : distro_archtecture)"
@@ -84,6 +84,107 @@ if [ -e "${TARGET_OUTPUT}" ]; then
 fi
 }
 
+fn_make_busybox() {
+	echo "Bootstrap"
+
+	# Need busbox for bootstrapping
+	local ALPINE_ARCH=${TARGET_ARCH}
+	ALPINE_ARCH=${ALPINE_ARCH/x64/x86_64}
+	ALPINE_ARCH=${ALPINE_ARCH/armv7h/armv7}
+	ALPINE_ARCH=${ALPINE_ARCH/armhf/armv7}
+	ALPINE_ARCH=${ALPINE_ARCH/aarch64/aarch64}
+
+	local busybox="https://mirror.xtom.com.hk/alpine/edge/main/${ALPINE_ARCH}/$(wget https://mirror.xtom.com.hk/alpine/edge/main/${ALPINE_ARCH}/ -q -O - | grep busybox-static | sed -e 's/^.*href="\([^"]*\)".*$/\1/g')"
+	wget "${busybox}" -q -O - | tar zxf - -C ${TARGET_OUTPUT}/
+	rm -rf ${TARGET_OUTPUT}/.PKGINFO ${TARGET_OUTPUT}/.SIGN.RSA*
+
+	for x in bin dev etc home lib opt proc root run sbin sys tmp var usr
+	do
+		mkdir -p ${TARGET_OUTPUT}/${x}
+	done
+	chmod 1777 ${TARGET_OUTPUT}/tmp
+	for x in bin lib local sbin share
+	do
+		mkdir -p ${TARGET_OUTPUT}/usr/${x}
+	done
+	for x in bin lib sbin share
+	do
+		mkdir -p ${TARGET_OUTPUT}/usr/local/${x}
+	done
+	for x in log
+	do
+		mkdir -p ${TARGET_OUTPUT}/var/${x}
+	done
+
+	#qemu
+	mkdir -p ${TARGET_OUTPUT}/usr/bin
+	if [ ! -z "${TARGET_QEMU}" ]; then
+		mkdir -p ${TARGET_OUTPUT}/usr/bin
+		cp extras/${TARGET_QEMU} ${TARGET_OUTPUT}/usr/bin/
+
+		chroot_cmd() {
+			QEMU_EXECVE=1 chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve "${@}"
+		}
+	else
+		chroot_cmd() {
+			chroot "${TARGET_OUTPUT}" "${@}"
+		}
+	fi
+
+	#resolve
+	cat <<- EOF > ${TARGET_OUTPUT}/etc/resolv.conf
+	nameserver 1.1.1.1
+	nameserver 1.0.0.1
+	EOF
+
+	cat <<- EOF > ${TARGET_OUTPUT}/etc/passwd
+	root::0:0:Root:/root:/bin/sh
+	nobody:x:65534:65534:nobody:/:/sbin/nologin
+	EOF
+	cat <<- EOF > ${TARGET_OUTPUT}/etc/group
+	root:x:0:root
+	users:x:100:
+	nobody:x:65534:
+	EOF
+	cat <<- EOF >> ${TARGET_OUTPUT}/etc/os-release
+	NAME=busybox
+	ID=busybox
+	EOF
+	cat <<- 'EOF' >> ${TARGET_OUTPUT}/etc/profile
+	export CHARSET=UTF-8
+	export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+	export PAGER=less
+	export PS1='\h:\w\$ '
+	umask 022
+
+	for script in /etc/profile.d/*.sh ; do
+	    if [ -r $script ] ; then
+	        . $script
+	    fi
+	done
+	EOF
+	chmod 755 ${TARGET_OUTPUT}/etc/profile
+	mkdir -p ${TARGET_OUTPUT}/etc/profile.d
+
+	#timezone
+	if [ -e ${TARGET_OUTPUT}/usr/share/zoneinfo/${TARGET_TIMEZONE} ]; then
+		ln -s /usr/share/zoneinfo/${TARGET_TIMEZONE} ${TARGET_OUTPUT}/etc/localtime
+	elif [ -e /usr/share/zoneinfo/${TARGET_TIMEZONE} ]; then
+		cat /usr/share/zoneinfo/${TARGET_TIMEZONE} > ${TARGET_OUTPUT}/etc/localtime
+	elif [ -e /etc/zoneinfo/${TARGET_TIMEZONE} ]; then
+		cat /etc/zoneinfo/${TARGET_TIMEZONE} > ${TARGET_OUTPUT}/etc/localtime
+	fi
+
+	chroot_cmd /bin/busybox.static sh -c "/bin/busybox.static --install -s ; /bin/busybox.static add-shell /bin/sh"
+
+
+	echo "Clearing"
+
+	echo
+
+	fn_make_common
+}
+
 fn_make_alpine() {
 	echo "Bootstrap"
 
@@ -107,23 +208,30 @@ fn_make_alpine() {
 	if [ ! -z "${TARGET_QEMU}" ]; then
 		mkdir -p ${TARGET_OUTPUT}/usr/bin
 		cp extras/${TARGET_QEMU} ${TARGET_OUTPUT}/usr/bin/
+
+		run_cmd() {
+			QEMU_EXECVE=1 /usr/bin/${TARGET_QEMU} -execve "${@}"
+		}
+		chroot_cmd() {
+			QEMU_EXECVE=1 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin LANG=C LC_ALL=C chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve "${@}"
+		}
+	else
+		run_cmd() {
+			"${@}"
+		}
+		chroot_cmd() {
+			PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin LANG=C LC_ALL=C chroot "${TARGET_OUTPUT}" "${@}"
+		}
 	fi
 	local APK_VERSION="$(wget -q -O - ${ALPINE_MIRROR}/${ALPINE_DIST}/main/${ALPINE_ARCH}/APKINDEX.tar.gz | tar -Oxz | grep --text '^P:apk-tools-static$' -A1 | tail -n1 | cut -d: -f2)"
-	wget -q -O - ${ALPINE_MIRROR}/${ALPINE_DIST}/main/${ALPINE_ARCH}/apk-tools-static-${APK_VERSION}.apk | tar -xz -C "${TARGET_OUTPUT}" sbin/apk.static  2>/dev/null
+	wget ${ALPINE_MIRROR}/${ALPINE_DIST}/main/${ALPINE_ARCH}/apk-tools-static-${APK_VERSION}.apk -q -O - | tar -xz -C "${TARGET_OUTPUT}" sbin/apk.static  2>/dev/null
 
-	if [ ! -z "${TARGET_QEMU}" ]; then
-		QEMU_EXECVE=1 /usr/bin/${TARGET_QEMU} -execve ${TARGET_OUTPUT}/sbin/apk.static --repository ${ALPINE_MIRROR}/${ALPINE_DIST}/main --no-cache --no-script --allow-untrusted --root "${TARGET_OUTPUT}" --initdb add busybox alpine-baselayout alpine-keys apk-tools libc-utils
-		for link in $(QEMU_EXECVE=1 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin LANG=C LC_ALL=C chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "/bin/busybox --list-full"); do
-			[ -e "${TARGET_OUTPUT}"/$link ] || ln -s /bin/busybox "${TARGET_OUTPUT}"/$link
-		done
-		QEMU_EXECVE=1 /usr/bin/${TARGET_QEMU} -execve ${TARGET_OUTPUT}/sbin/apk.static --repository ${ALPINE_MIRROR}/${ALPINE_DIST}/main --no-cache --allow-untrusted --root "${TARGET_OUTPUT}" --stdout --quiet fetch alpine-base | tar -zx -C "${TARGET_OUTPUT}" etc/
-	else
-		${TARGET_OUTPUT}/sbin/apk.static --repository ${ALPINE_MIRROR}/${ALPINE_DIST}/main --no-cache --no-script --allow-untrusted --root "${TARGET_OUTPUT}" --initdb add busybox alpine-baselayout alpine-keys apk-tools libc-utils
-		for link in $("${TARGET_OUTPUT}"/bin/busybox --list-full); do
-			[ -e "${TARGET_OUTPUT}"/$link ] || ln -s /bin/busybox "${TARGET_OUTPUT}"/$link
-		done
-		${TARGET_OUTPUT}/sbin/apk.static --repository ${ALPINE_MIRROR}/${ALPINE_DIST}/main --no-cache --allow-untrusted --root "${TARGET_OUTPUT}" --stdout --quiet fetch alpine-base | tar -zx -C "${TARGET_OUTPUT}" etc/
-	fi
+	run_cmd ${TARGET_OUTPUT}/sbin/apk.static --repository ${ALPINE_MIRROR}/${ALPINE_DIST}/main --no-cache --no-script --allow-untrusted --root "${TARGET_OUTPUT}" --initdb add busybox alpine-baselayout alpine-keys apk-tools libc-utils
+	#for link in $(run_cmd "${TARGET_OUTPUT}"/bin/busybox --list-full); do
+	#	[ -e "${TARGET_OUTPUT}"/$link ] || ln -s /bin/busybox "${TARGET_OUTPUT}"/${link}
+	#done
+	chroot_cmd /bin/busybox --install -s
+	run_cmd ${TARGET_OUTPUT}/sbin/apk.static --repository ${ALPINE_MIRROR}/${ALPINE_DIST}/main --no-cache --allow-untrusted --root "${TARGET_OUTPUT}" --stdout --quiet fetch alpine-base | tar -zx -C "${TARGET_OUTPUT}" etc/
 
 	echo
 
@@ -143,39 +251,38 @@ fn_make_alpine() {
 	fi
 
 	#resolve
-	cat << EOF > ${TARGET_OUTPUT}/etc/resolv.conf
-nameserver 1.1.1.1
-nameserver 1.0.0.1
-EOF
+	cat <<- EOF > ${TARGET_OUTPUT}/etc/resolv.conf
+	nameserver 1.1.1.1
+	nameserver 1.0.0.1
+	EOF
 
 	#timezone
 	echo "${TARGET_TIMEZONE}" > ${TARGET_OUTPUT}/etc/TZ
-	#if [ -e "${TARGET_OUTPUT}/usr/share/zoneinfo/${TARGET_TIMEZONE}" ]; then
-	#	ln -sf /usr/share/zoneinfo/${TARGET_TIMEZONE} ${TARGET_OUTPUT}/etc/localtime
+	if [ -e ${TARGET_OUTPUT}/usr/share/zoneinfo/${TARGET_TIMEZONE} ]; then
+		rm -rf ${TARGET_OUTPUT}/etc/localtime
+		ln -s /usr/share/zoneinfo/${TARGET_TIMEZONE} ${TARGET_OUTPUT}/etc/localtime
+	elif [ -e /usr/share/zoneinfo/${TARGET_TIMEZONE} ]; then
+		rm -rf ${TARGET_OUTPUT}/etc/localtime
+		cat /usr/share/zoneinfo/${TARGET_TIMEZONE} > ${TARGET_OUTPUT}/etc/localtime
+	elif [ -e /etc/zoneinfo/${TARGET_TIMEZONE} ]; then
+		rm -rf ${TARGET_OUTPUT}/etc/localtime
+		cat /etc/zoneinfo/${TARGET_TIMEZONE} > ${TARGET_OUTPUT}/etc/localtime
+	fi
+	#local tz1=$(echo "${TARGET_TIMEZONE}" | cut -d '/' -f 1)
+	#local tz2=$(echo "${TARGET_TIMEZONE}" | cut -d '/' -f 2)
+	#mkdir -p ${TARGET_OUTPUT}/tmp/tzdata
+	#run_cmd ${TARGET_OUTPUT}/sbin/apk.static --repository ${ALPINE_MIRROR}/${ALPINE_DIST}/main --no-cache --allow-untrusted --root "${TARGET_OUTPUT}" --stdout --quiet fetch tzdata | tar -zx -C "${TARGET_OUTPUT}/tmp/tzdata" usr/share/zoneinfo
+	#if [ -e ${TARGET_OUTPUT}/tmp/tzdata/usr/share/zoneinfo/${tz1}/${tz2} ]; then
+	#	mkdir -p ${TARGET_OUTPUT}/etc/zoneinfo/${tz1}
+	#	cp ${TARGET_OUTPUT}/tmp/tzdata/usr/share/zoneinfo/${tz1}/${tz2} ${TARGET_OUTPUT}/etc/zoneinfo/${tz1}/${tz2}
+	#	ln -sf /etc/zoneinfo/${tz1}/${tz2} ${TARGET_OUTPUT}/etc/localtime
 	#fi
-	local tz1=$(echo "${TARGET_TIMEZONE}" | cut -d '/' -f 1)
-	local tz2=$(echo "${TARGET_TIMEZONE}" | cut -d '/' -f 2)
-	mkdir -p ${TARGET_OUTPUT}/tmp/tzdata
-	if [ ! -z "${TARGET_QEMU}" ]; then
-		QEMU_EXECVE=1 /usr/bin/${TARGET_QEMU} -execve ${TARGET_OUTPUT}/sbin/apk.static --repository ${ALPINE_MIRROR}/${ALPINE_DIST}/main --no-cache --allow-untrusted --root "${TARGET_OUTPUT}" --stdout --quiet fetch tzdata | tar -zx -C "${TARGET_OUTPUT}/tmp/tzdata" usr/share/zoneinfo
-	else
-		${TARGET_OUTPUT}/sbin/apk.static --repository ${ALPINE_MIRROR}/${ALPINE_DIST}/main --no-cache --allow-untrusted --root "${TARGET_OUTPUT}" --stdout --quiet fetch tzdata | tar -zx -C "${TARGET_OUTPUT}/tmp/tzdata" usr/share/zoneinfo
-	fi
-	if [ -e ${TARGET_OUTPUT}/tmp/tzdata/usr/share/zoneinfo/${tz1}/${tz2} ]; then
-		mkdir -p ${TARGET_OUTPUT}/etc/zoneinfo/${tz1}
-		cp ${TARGET_OUTPUT}/tmp/tzdata/usr/share/zoneinfo/${tz1}/${tz2} ${TARGET_OUTPUT}/etc/zoneinfo/${tz1}/${tz2}
-		ln -sf /etc/zoneinfo/${tz1}/${tz2} ${TARGET_OUTPUT}/etc/localtime
-	fi
-	rm -rf ${TARGET_OUTPUT}/tmp/tzdata
+	#rm -rf ${TARGET_OUTPUT}/tmp/tzdata
 
 	echo
 
 
 	echo "Clearing"
-
-	rm -rf ${TARGET_OUTPUT}/sbin/apk.static
-	rm -rf ${TARGET_OUTPUT}/var/cache/apk/*
-	rm -rf ${TARGET_OUTPUT}/tmp/*
 
 	echo
 
@@ -184,7 +291,7 @@ EOF
 
 fn_make_entware() {
 	echo "Bootstrap"
-	local USE_LOCALE=N
+	local USE_LOCALE=Y
 
 	local ENTWARE_VER=
 	if [ "${TARGET_ARCH}" = "x64" ]; then
@@ -202,111 +309,117 @@ fn_make_entware() {
 	ALPINE_ARCH=${ALPINE_ARCH/armhf/armv7}
 	ALPINE_ARCH=${ALPINE_ARCH/aarch64/aarch64}
 
+	#busybox
 	local busybox="https://mirror.xtom.com.hk/alpine/edge/main/${ALPINE_ARCH}/$(wget https://mirror.xtom.com.hk/alpine/edge/main/${ALPINE_ARCH}/ -q -O - | grep busybox-static | sed -e 's/^.*href="\([^"]*\)".*$/\1/g')"
 	wget "${busybox}" -q -O - | tar zxf - -C ${TARGET_OUTPUT}/
 	rm -rf ${TARGET_OUTPUT}/.PKGINFO ${TARGET_OUTPUT}/.SIGN.RSA*
-	#qemu
-	mkdir -p ${TARGET_OUTPUT}/bin ${TARGET_OUTPUT}/sbin ${TARGET_OUTPUT}/usr/bin ${TARGET_OUTPUT}/usr/sbin ${TARGET_OUTPUT}/usr/local/bin ${TARGET_OUTPUT}/usr/local/sbin
-	if [ ! -z "${TARGET_QEMU}" ]; then
-		mkdir -p ${TARGET_OUTPUT}/usr/bin
-		cp extras/${TARGET_QEMU} ${TARGET_OUTPUT}/usr/bin/
-	fi
-
-	#if [ ! -z "${TARGET_QEMU}" ]; then
-	#	QEMU_EXECVE=1 PATH="/opt/sbin:/opt/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/busybox.static --install -s
-	#else
-	#	chroot ${TARGET_OUTPUT} /bin/busybox.static --install -s
-	#fi
 	ln -s /bin/busybox.static ${TARGET_OUTPUT}/bin/sh
 	ln -s /bin/busybox.static ${TARGET_OUTPUT}/bin/wget
 	ln -s /bin/busybox.static ${TARGET_OUTPUT}/bin/mkdir
 	ln -s /bin/busybox.static ${TARGET_OUTPUT}/bin/chmod
 	ln -s /bin/busybox.static ${TARGET_OUTPUT}/bin/ln
 
+	#qemu
+	mkdir -p ${TARGET_OUTPUT}/usr/bin
+	if [ ! -z "${TARGET_QEMU}" ]; then
+		mkdir -p ${TARGET_OUTPUT}/usr/bin
+		cp extras/${TARGET_QEMU} ${TARGET_OUTPUT}/usr/bin/
+
+		chroot_cmd() {
+			QEMU_EXECVE=1 PATH="/opt/sbin:/opt/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve "${@}"
+		}
+	else
+		chroot_cmd() {
+			PATH="/opt/sbin:/opt/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" chroot "${TARGET_OUTPUT}" "${@}"
+		}
+	fi
+
 	#Create basic directory
-	for folder in dev etc root home proc run sys tmp var
+	for folder in dev etc proc run sys
 	do
 		mkdir -p ${TARGET_OUTPUT}/${folder}
 	done
 
 	#resolve
-	cat << EOF > ${TARGET_OUTPUT}/etc/resolv.conf
-nameserver 1.1.1.1
-nameserver 1.0.0.1
-EOF
+	cat <<- EOF > ${TARGET_OUTPUT}/etc/resolv.conf
+	nameserver 1.1.1.1
+	nameserver 1.0.0.1
+	EOF
 
 	#Intall entware
 	wget http://bin.entware.net/${ENTWARE_VER}/installer/generic.sh -q -O ${TARGET_OUTPUT}/entware_install.sh
 	sed -i -e 's|/opt/bin/opkg install entware-opt|#/opt/bin/opkg install entware-opt|g' ${TARGET_OUTPUT}/entware_install.sh
 	sed -i -e 's|chmod 777 /opt/tmp|chmod 777 /opt/tmp\nexit 0|g' ${TARGET_OUTPUT}/entware_install.sh
-
-	if [ ! -z "${TARGET_QEMU}" ]; then
-		QEMU_EXECVE=1 PATH="/opt/sbin:/opt/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "/bin/sh /entware_install.sh ; /opt/bin/opkg install opkg busybox entware-release"
-	else
-		chroot "${TARGET_OUTPUT}" /bin/sh -c "/bin/sh /entware_install.sh ; /opt/bin/opkg install opkg busybox entware-release"
-	fi
+	chroot_cmd /bin/sh -c "/bin/sh /entware_install.sh ; /opt/bin/opkg install opkg busybox entware-release"
 	rm -rf ${TARGET_OUTPUT}/entware_install.sh
-	rm -rf ${TARGET_OUTPUT}/bin ${TARGET_OUTPUT}/sbin ${TARGET_OUTPUT}/lib
-	ln -s opt/bin ${TARGET_OUTPUT}/bin
-	ln -s opt/sbin ${TARGET_OUTPUT}/sbin
-	ln -s opt/lib ${TARGET_OUTPUT}/lib
-	if [ "${TARGET_ARCH}" = "x64" ]; then
-		ln -s opt/lib ${TARGET_OUTPUT}/lib64
-	fi
-	if [ "${TARGET_ARCH}" = "armhf" ]; then
-		ln -s ld-2.27.so ${TARGET_OUTPUT}/lib/ld-linux-armhf.so.3
-	fi
-	if [ ! -z "${TARGET_QEMU}" ]; then
-		QEMU_EXECVE=1 PATH="/opt/sbin:/opt/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "/opt/bin/opkg update ; /opt/bin/opkg download entware-opt"
-	else
-		chroot "${TARGET_OUTPUT}" /bin/sh -c "/opt/bin/opkg update ; /opt/bin/opkg download entware-opt"
-	fi
-	tar zxf ${TARGET_OUTPUT}/entware-opt* -C ${TARGET_OUTPUT}/
-	tar zxf ${TARGET_OUTPUT}/data.tar.gz -C ${TARGET_OUTPUT}/
-	rm -rf ${TARGET_OUTPUT}/entware-opt* ${TARGET_OUTPUT}/debian-binary ${TARGET_OUTPUT}/data.tar.gz ${TARGET_OUTPUT}/control.tar.gz
 
-	#Link directory
-	mkdir -p ${TARGET_OUTPUT}/usr/bin ${TARGET_OUTPUT}/usr/sbin ${TARGET_OUTPUT}/usr/local/bin ${TARGET_OUTPUT}/usr/local/sbin
+	#ln
+	for x in bin sbin lib var tmp root home usr
+	do
+		if [ ! -e ${TARGET_OUTPUT}/opt/${x} ]; then
+			mkdir -p ${TARGET_OUTPUT}/opt/${x}
+		fi
+		rm -rf ${TARGET_OUTPUT}/${x}
+		ln -sf opt/${x} ${TARGET_OUTPUT}/${x}
+	done
+	chmod 1777 ${TARGET_OUTPUT}/opt/tmp
+	if [ "${TARGET_ARCH}" = "x64" ]; then
+		rm -rf ${TARGET_OUTPUT}/lib64
+		ln -sf opt/lib ${TARGET_OUTPUT}/lib64
+	fi
+	if [ "${TARGET_ARCH}" = "armhf" -a ! -e ${TARGET_OUTPUT}/opt/lib/ld-linux-armhf.so.3 ]; then
+		ln -sf $(basename $(ls ${TARGET_OUTPUT}/opt/lib/ld-*.so)) ${TARGET_OUTPUT}/opt/lib/ld-linux-armhf.so.3
+	fi
+
+	#qemu
+	mkdir -p ${TARGET_OUTPUT}/usr/bin
 	if [ ! -z "${TARGET_QEMU}" ]; then
 		mkdir -p ${TARGET_OUTPUT}/usr/bin
 		cp extras/${TARGET_QEMU} ${TARGET_OUTPUT}/usr/bin/
 	fi
-	rm -rf ${TARGET_OUTPUT}/etc
-	cp -r ${TARGET_OUTPUT}/opt/etc ${TARGET_OUTPUT}/etc
-	mv ${TARGET_OUTPUT}/etc/shells.1 ${TARGET_OUTPUT}/etc/shells
-	rm -rf ${TARGET_OUTPUT}/etc/*.1 ${TARGET_OUTPUT}/opt/etc/*.1
-	cat << EOF > ${TARGET_OUTPUT}/etc/passwd
-root::0:0:Root:/root:/opt/bin/sh
-nobody:x:99:99::/opt/home:/opt/bin/false
-EOF
-	cat << EOF > ${TARGET_OUTPUT}/etc/group
-root:x:0:root
-nobody:x:98:nobody
-nogroup:x:99:
-users:x:100:
-EOF
-	sed -i -e 's/^export LANG=/#export LANG=/g' -e 's/^export LC_ALL=/#export LC_ALL=/g' ${TARGET_OUTPUT}/etc/profile
-	echo >> ${TARGET_OUTPUT}/etc/profile
-	echo "export LD_LIBRARY_PATH=/opt/lib" >> ${TARGET_OUTPUT}/etc/profile
-	cp -ar ${TARGET_OUTPUT}/opt/etc/skel/. ${TARGET_OUTPUT}/root/
-	ln -sf /etc/passwd ${TARGET_OUTPUT}/opt/etc/passwd
-	ln -sf /etc/group ${TARGET_OUTPUT}/opt/etc/group
-	ln -sf /etc/shells ${TARGET_OUTPUT}/opt/etc/shells
-	ln -sf /etc/profile ${TARGET_OUTPUT}/opt/etc/profile
-	if [ -e "/etc/zoneinfo/${TARGET_TIMEZONE}" ]; then
-		cat "/etc/zoneinfo/${TARGET_TIMEZONE}" > ${TARGET_OUTPUT}/etc/localtime
-	elif [ -e /etc/localtime ]; then
-		cat /etc/localtime/${TARGET_OUTPUT}/etc/localtime
-	fi
-	if [ -e ${TARGET_OUTPUT}/etc/localtime ]; then
-		ln -s /etc/localtime ${TARGET_OUTPUT}/opt/etc/localtime
-	fi
+
+	chroot_cmd /bin/sh -c "/opt/bin/opkg update ; /opt/bin/opkg download entware-opt"
+	tar zxf ${TARGET_OUTPUT}/entware-opt* -C ${TARGET_OUTPUT}/
+	tar zxf ${TARGET_OUTPUT}/data.tar.gz -C ${TARGET_OUTPUT}/
+	rm -rf ${TARGET_OUTPUT}/entware-opt* ${TARGET_OUTPUT}/debian-binary ${TARGET_OUTPUT}/data.* ${TARGET_OUTPUT}/control.*
+
+	#etc
+	mkdir -p ${TARGET_OUTPUT}/usr/bin ${TARGET_OUTPUT}/usr/sbin ${TARGET_OUTPUT}/usr/local/bin ${TARGET_OUTPUT}/usr/local/sbin
+	mv ${TARGET_OUTPUT}/opt/etc/shells.1 ${TARGET_OUTPUT}/opt/etc/shells
+	rm -rf ${TARGET_OUTPUT}/opt/etc/*.1
+	cat <<- EOF > ${TARGET_OUTPUT}/opt/etc/passwd
+	root::0:0:Root:/root:/opt/bin/sh
+	nobody:x:65534:65534:nobody:/:/sbin/nologin
+	EOF
+	cat <<- EOF > ${TARGET_OUTPUT}/opt/etc/group
+	root:x:0:root
+	users:x:100:
+	nobody:x:65534:
+	EOF
+	sed -i -e 's/^export LANG=/#export LANG=/g' -e 's/^export LC_ALL=/#export LC_ALL=/g' ${TARGET_OUTPUT}/opt/etc/profile
+	echo >> ${TARGET_OUTPUT}/opt/etc/profile
+	echo "export LD_LIBRARY_PATH=/opt/lib" >> ${TARGET_OUTPUT}/opt/etc/profile
 
 	#resolve
-	cat << EOF > ${TARGET_OUTPUT}/etc/resolv.conf
-nameserver 1.1.1.1
-nameserver 1.0.0.1
-EOF
+	cat <<- EOF > ${TARGET_OUTPUT}/etc/resolv.conf
+	nameserver 1.1.1.1
+	nameserver 1.0.0.1
+	EOF
+
+	#skel
+	cp -ar ${TARGET_OUTPUT}/opt/etc/skel/. ${TARGET_OUTPUT}/root/
+
+	#timezone
+	if [ -e ${TARGET_OUTPUT}/opt/share/zoneinfo/${TARGET_TIMEZONE} ]; then
+		rm -rf ${TARGET_OUTPUT}/etc/localtime
+		ln -s /opt/share/zoneinfo/${TARGET_TIMEZONE} ${TARGET_OUTPUT}/opt/etc/localtime
+	elif [ -e /usr/share/zoneinfo/${TARGET_TIMEZONE} ]; then
+		rm -rf ${TARGET_OUTPUT}/etc/localtime
+		cat /usr/share/zoneinfo/${TARGET_TIMEZONE} > ${TARGET_OUTPUT}/opt/etc/localtime
+	elif [ -e /etc/zoneinfo/${TARGET_TIMEZONE} ]; then
+		rm -rf ${TARGET_OUTPUT}/etc/localtime
+		cat /etc/zoneinfo/${TARGET_TIMEZONE} > ${TARGET_OUTPUT}/opt/etc/localtime
+	fi
 
 	#Locales
 	if [ "${USE_LOCALE}" = "Y" ]; then
@@ -331,191 +444,27 @@ EOF
 		cp ${TARGET_OUTPUT}/locales/i18n/charmaps/CP949.gz ${TARGET_OUTPUT}/opt/usr/share/i18n/charmaps/CP949.gz
 		gzip -dc ${TARGET_OUTPUT}/locales/i18n/charmaps/CP949.gz > ${TARGET_OUTPUT}/opt/usr/share/i18n/charmaps/CP949
 		rm -rf ${TARGET_OUTPUT}/locales
-		if [ ! -z "${TARGET_QEMU}" ]; then
-			QEMU_EXECVE=1 PATH="/opt/sbin:/opt/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /opt/bin/localedef.new -c -f UTF-8 -i en_US en_US.UTF-8
-			if [ ! -z "${TARGET_LOCALE}" -a "${TARGET_LOCALE}" != "en_US.UTF-8" ]; then
-				local l1="$(echo "${TARGET_LOCALE}" | cut -d '.' -f 1)"
-				local l2="$(echo "${TARGET_LOCALE}" | cut -d '.' -f 2)"
-				QEMU_EXECVE=1 PATH="/opt/sbin:/opt/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /opt/bin/localedef.new -c -f ${l2} -i ${l1} ${l1}.${l2}
-			fi
-		else
-			chroot "${TARGET_OUTPUT}" /opt/bin/localedef.new -c -f UTF-8 -i en_US en_US.UTF-8
-			if [ ! -z "${TARGET_LOCALE}" -a "${TARGET_LOCALE}" != "en_US.UTF-8" ]; then
-				local l1="$(echo "${TARGET_LOCALE}" | cut -d '.' -f 1)"
-				local l2="$(echo "${TARGET_LOCALE}" | cut -d '.' -f 2)"
-				chroot "${TARGET_OUTPUT}" /opt/bin/localedef.new -c -f ${l2} -i ${l1} ${l1}.${l2}
-			fi
-		fi
+		local l1="$(echo "${TARGET_LOCALE}" | cut -d '.' -f 1)"
+		local l2="$(echo "${TARGET_LOCALE}" | cut -d '.' -f 2)"
+		chroot_cmd /opt/bin/localedef.new -c -f ${l2} -i ${l1} ${l1}.${l2}
 	else
 		#Ignore locales
 		mkdir --p ${TARGET_OUTPUT}/opt/usr/lib/locale
-		touch ${TARGET_OUTPUT}/opt/usr/lib/locale/locale-archive
-
-		if [ ! -z "${TARGET_QEMU}" ]; then
-			QEMU_EXECVE=1 PATH="/opt/sbin:/opt/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "/opt/bin/opkg install locales ; rm -rf /opt/usr/lib/locale/locale-archive ; /opt/bin/localedef.new -c -f UTF-8 -i en_US en_US.UTF-8 ; /opt/bin/opkg remove locales --autoremove"
-		else
-			chroot "${TARGET_OUTPUT}" /bin/sh -c "/opt/bin/opkg install locales ; rm -rf /opt/usr/lib/locale/locale-archive ; /opt/bin/localedef.new -c -f UTF-8 -i en_US en_US.UTF-8 ; /opt/bin/opkg remove locales --autoremove"
-
-		fi
+		local l1="$(echo "${TARGET_LOCALE}" | cut -d '.' -f 1)"
+		local l2="$(echo "${TARGET_LOCALE}" | cut -d '.' -f 2)"
+		chroot_cmd /bin/sh -c "touch /opt/usr/lib/locale/locale-archive ; /opt/bin/opkg install locales ; rm -rf /opt/usr/lib/locale/locale-archive ; /opt/bin/localedef.new -c -f ${l2} -i ${l1} ${l1}.${l2} ; /opt/bin/opkg remove locales --autoremove"
 	fi
+
+	for x in entware_release passwd group localtime passwd profile shells
+	do
+		if [ -e ${TARGET_OUTPUT}/opt/etc/${x} ]; then
+			ln -sf /opt/etc/${x} /${TARGET_OUTPUT}/etc/
+		fi
+	done
+	ln -sf /etc/resolv.conf ${TARGET_OUTPUT}/opt/etc/resolv.conf
+
 
 	echo "Clearing"
-
-	rm -rf ${TARGET_OUTPUT}/opt/tmp/opkg-*
-	rm -rf ${TARGET_OUTPUT}/tmp/*
-
-	echo
-
-	fn_make_common
-}
-
-fn_make_entware_normal() {
-	echo "Bootstrap"
-
-	local ENTWARE_VER=
-	if [ "${TARGET_ARCH}" = "x64" ]; then
-		ENTWARE_VER="$(wget http://bin.entware.net/ -q -O - | grep 'x64-' | tail -1 | sed -e 's/^.*a href="\([^"]*\)\/".*$/\1/g')"
-	elif [ "${TARGET_ARCH}" = "aarch64" ]; then
-		ENTWARE_VER="$(wget http://bin.entware.net/ -q -O - | grep 'aarch64-' | tail -1 | sed -e 's/^.*a href="\([^"]*\)\/".*$/\1/g')"
-	elif [ "${TARGET_ARCH}" = "armhf" ]; then
-		ENTWARE_VER="$(wget http://bin.entware.net/ -q -O - | grep 'armv7sf-' | tail -1 | sed -e 's/^.*a href="\([^"]*\)\/".*$/\1/g')"
-	fi
-
-	# Need busbox for bootstrapping
-	local ALPINE_ARCH=${TARGET_ARCH}
-	ALPINE_ARCH=${ALPINE_ARCH/x64/x86_64}
-	ALPINE_ARCH=${ALPINE_ARCH/armv7h/armv7}
-	ALPINE_ARCH=${ALPINE_ARCH/armhf/armv7}
-	ALPINE_ARCH=${ALPINE_ARCH/aarch64/aarch64}
-
-	local busybox="https://mirror.xtom.com.hk/alpine/edge/main/${ALPINE_ARCH}/$(wget https://mirror.xtom.com.hk/alpine/edge/main/${ALPINE_ARCH}/ -q -O - | grep busybox-static | sed -e 's/^.*href="\([^"]*\)".*$/\1/g')"
-	wget "${busybox}" -q -O - | tar zxf - -C ${TARGET_OUTPUT}/
-	rm -rf ${TARGET_OUTPUT}/.PKGINFO ${TARGET_OUTPUT}/.SIGN.RSA*
-	#qemu
-	if [ ! -z "${TARGET_QEMU}" ]; then
-		mkdir -p ${TARGET_OUTPUT}/usr/bin
-		cp extras/${TARGET_QEMU} ${TARGET_OUTPUT}/usr/bin/
-	fi
-
-	if [ ! -z "${TARGET_QEMU}" ]; then
-		QEMU_EXECVE=1 PATH="/opt/sbin:/opt/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/busybox.static --install /bin
-	else
-		chroot ${TARGET_OUTPUT} /bin/busybox.static --install /bin
-	fi
-
-	#Create basic directory
-	for folder in bin sbin usr lib root dev etc home proc run sys tmp var
-	do
-		mkdir -p ${TARGET_OUTPUT}/${folder}
-	done
-
-	#resolve
-	cat << EOF > ${TARGET_OUTPUT}/etc/resolv.conf
-nameserver 1.1.1.1
-nameserver 1.0.0.1
-EOF
-
-	#Ignore locales
-	mkdir --p ${TARGET_OUTPUT}/opt/usr/lib/locale
-	touch ${TARGET_OUTPUT}/opt/usr/lib/locale/locale-archive
-
-	#Intall entware
-	wget http://bin.entware.net/${ENTWARE_VER}/installer/generic.sh -q -O ${TARGET_OUTPUT}/entware_install.sh
-	#sed -i -e 's|/opt/bin/opkg install entware-opt|#/opt/bin/opkg install entware-opt|g' ${TARGET_OUTPUT}/entware_install.sh
-	if [ ! -z "${TARGET_QEMU}" ]; then
-		QEMU_EXECVE=1 PATH="/opt/sbin:/opt/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh /entware_install.sh
-	else
-		chroot "${TARGET_OUTPUT}" /bin/sh /entware_install.sh
-	fi
-	rm -rf ${TARGET_OUTPUT}/entware_install.sh
-
-	#Insall busybox
-	if [ ! -z "${TARGET_QEMU}" ]; then
-		QEMU_EXECVE=1 PATH="/opt/sbin:/opt/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /opt/bin/opkg install busybox ca-certificates wget
-	else
-		chroot "${TARGET_OUTPUT}" /opt/bin/opkg install busybox ca-certificates wget
-	fi
-	for bb in ash sh netstat
-	do
-		ln -sf /opt/bin/busybox ${TARGET_OUTPUT}/opt/bin/${bb}
-	done
-	rm -rf ${TARGET_OUTPUT}/bin/*
-
-	#Link directory
-	for x in $(ls ${TARGET_OUTPUT}/opt/)
-	do
-		if [ ! -d ${TARGET_OUTPUT}/opt/${x} ] ; then
-			continue
-		fi
-		opt_dir=$(basename "${x}")
-		if [ "${opt_dir}" != "etc" -a "${opt_dir}" != "root" -a "${opt_dir}" != "home" -a "${opt_dir}" != "share" ]; then
-			rm -rf ${TARGET_OUTPUT}/${opt_dir}
-			#mv ${TARGET_OUTPUT}/opt/${opt_dir} ${TARGET_OUTPUT}/${opt_dir}
-			#ln -s ../${opt_dir} ${TARGET_OUTPUT}/opt/${opt_dir}
-			ln -s opt/${opt_dir} ${TARGET_OUTPUT}/${opt_dir}
-		fi
-	done
-	mkdir -p ${TARGET_OUTPUT}/usr/bin ${TARGET_OUTPUT}/usr/sbin ${TARGET_OUTPUT}/usr/local/bin ${TARGET_OUTPUT}/usr/local/sbin
-	if [ "${TARGET_ARCH}" = "x64" ]; then
-		ln -s opt/lib ${TARGET_OUTPUT}/lib64
-	fi
-	if [ ! -z "${TARGET_QEMU}" ]; then
-		mkdir -p ${TARGET_OUTPUT}/usr/bin
-		cp extras/${TARGET_QEMU} ${TARGET_OUTPUT}/usr/bin/
-	fi
-	rm -rf ${TARGET_OUTPUT}/etc
-	cp -r ${TARGET_OUTPUT}/opt/etc ${TARGET_OUTPUT}/etc
-	rm -rf ${TARGET_OUTPUT}/etc/*.1
-	cat << EOF > ${TARGET_OUTPUT}/etc/passwd
-root::0:0:Root:/root:/opt/bin/sh
-nobody:x:99:99::/opt/home:/opt/bin/false
-EOF
-	cat << EOF > ${TARGET_OUTPUT}/etc/group
-root:x:0:root
-nobody:x:98:nobody
-nogroup:x:99:
-users:x:100:
-EOF
-	cp -ar ${TARGET_OUTPUT}/etc/skel/. ${TARGET_OUTPUT}/root/
-	ln -sf /etc/passwd ${TARGET_OUTPUT}/opt/etc/passwd
-	ln -sf /etc/group ${TARGET_OUTPUT}/opt/etc/group
-	if [ -e "/etc/zoneinfo/${TARGET_TIMEZONE}" ]; then
-		cat "/etc/zoneinfo/${TARGET_TIMEZONE}" > ${TARGET_OUTPUT}/etc/localtime
-	elif [ -e /etc/localtime ]; then
-		cat /etc/localtime/${TARGET_OUTPUT}/etc/localtime
-	fi
-
-	#resolve
-	cat << EOF > ${TARGET_OUTPUT}/etc/resolv.conf
-nameserver 1.1.1.1
-nameserver 1.0.0.1
-EOF
-
-	#Locales
-	rm -rf ${TARGET_OUTPUT}/opt/usr/lib/locale/locale-archive
-	mkdir -p ${TARGET_OUTPUT}/locales
-	wget http://pkg.entware.net/sources/i18n_glib227.tar.gz -q -O - | tar zxf - -C ${TARGET_OUTPUT}/locales/
-	cp ${TARGET_OUTPUT}/locales/i18n/locales/translit_hangul ${TARGET_OUTPUT}/opt/usr/share/i18n/locales/translit_hangul
-	cp ${TARGET_OUTPUT}/locales/i18n/locales/ko_KR ${TARGET_OUTPUT}/opt/usr/share/i18n/locales/ko_KR
-	cp ${TARGET_OUTPUT}/locales/i18n/charmaps/EUC-KR.gz ${TARGET_OUTPUT}/opt/usr/share/i18n/charmaps/EUC-KR.gz
-	gzip -dc ${TARGET_OUTPUT}/locales/i18n/charmaps/EUC-KR.gz > ${TARGET_OUTPUT}/opt/usr/share/i18n/charmaps/EUC-KR
-	cp ${TARGET_OUTPUT}/locales/i18n/charmaps/KSC5636.gz ${TARGET_OUTPUT}/opt/usr/share/i18n/charmaps/KSC5636.gz
-	gzip -dc ${TARGET_OUTPUT}/locales/i18n/charmaps/KSC5636.gz > ${TARGET_OUTPUT}/opt/usr/share/i18n/charmaps/KSC5636
-	cp ${TARGET_OUTPUT}/locales/i18n/charmaps/CP949.gz ${TARGET_OUTPUT}/opt/usr/share/i18n/charmaps/CP949.gz
-	gzip -dc ${TARGET_OUTPUT}/locales/i18n/charmaps/CP949.gz > ${TARGET_OUTPUT}/opt/usr/share/i18n/charmaps/CP949
-	rm -rf ${TARGET_OUTPUT}/locales
-	if [ ! -z "${TARGET_QEMU}" ]; then
-		QEMU_EXECVE=1 PATH="/opt/sbin:/opt/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /opt/bin/localedef.new -c -f UTF-8 -i en_US en_US.UTF-8
-		QEMU_EXECVE=1 PATH="/opt/sbin:/opt/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /opt/bin/localedef.new -c -f UTF-8 -i ko_KR ko_KR.UTF-8
-	else
-		chroot "${TARGET_OUTPUT}" /opt/bin/localedef.new -c -f UTF-8 -i en_US en_US.UTF-8
-		chroot "${TARGET_OUTPUT}" /opt/bin/localedef.new -c -f UTF-8 -i ko_KR ko_KR.UTF-8
-	fi
-
-	echo "Clearing"
-
-	rm -rf ${TARGET_OUTPUT}/opt/tmp/opkg-*
-	rm -rf ${TARGET_OUTPUT}/tmp/*
 
 	echo
 
@@ -548,49 +497,46 @@ fn_make_arch() {
 	ARCH_ARCH=${ARCH_ARCH/armhf/armv7h}
 	ARCH_ARCH=${ARCH_ARCH/aarch64/aarch64}
 
-	if [ -z "$(ls /var/cache/pacman/pkg | grep "${ARCH_ARCH}.pkg.tar.xz")" ]; then
-		rm -rf /var/cache/pacman/pkg/*
-	fi
-
 	if [ "${ARCH_ARCH}" = "armv7h" -o "${ARCH_ARCH}" = "aarch64" ]; then
-		PACMAN_MIRRORLIST='Server = http://mirror.archlinuxarm.org/$arch/$repo'
-		#PACMAN_MIRRORLIST='Server = http://tw.mirror.archlinuxarm.org/$arch/$repo'
+		#PACMAN_MIRRORLIST='Server = http://mirror.archlinuxarm.org/$arch/$repo'
+		#PACMAN_MIRRORLIST='Server = http://sg.mirror.archlinuxarm.org/$arch/$repo'
+		PACMAN_MIRRORLIST='Server = http://ca.us.mirror.archlinuxarm.org/$arch/$repo'
 		PACMAN_EXTRA_PKGS="archlinuxarm-keyring"
 		ARCH_KEYRING="archlinuxarm"
 	else
-		PACMAN_MIRRORLIST='Server = http://mirror.premi.st/archlinux/$repo/os/$arch'
+		PACMAN_MIRRORLIST='Server = http://ftp.lanet.kr/pub/archlinux/$repo/os/$arch'
 		PACMAN_EXTRA_PKGS=""
 		ARCH_KEYRING="archlinux"
 	fi
 
 	PACMAN_CONF="${TARGET_OUTPUT}/pacman.conf"
 
-	cat << EOF > "${PACMAN_CONF}"
-[options]
-HoldPkg = pacman glibc
-Architecture = ${ARCH_ARCH}
-SigLevel = Never
-LocalFileSigLevel = Never
-[core]
-${PACMAN_MIRRORLIST}
-[extra]
-${PACMAN_MIRRORLIST}
-[community]
-${PACMAN_MIRRORLIST}
-EOF
+	cat <<- EOF > "${PACMAN_CONF}"
+	[options]
+	HoldPkg = pacman glibc
+	Architecture = ${ARCH_ARCH}
+	SigLevel = Never
+	LocalFileSigLevel = Never
+	[core]
+	${PACMAN_MIRRORLIST}
+	[extra]
+	${PACMAN_MIRRORLIST}
+	[community]
+	${PACMAN_MIRRORLIST}
+	EOF
 	if [ "${ARCH_ARCH}" = "x86_64" ]; then
-	cat << EOF >> "${PACMAN_CONF}"
-[multilib]
-${PACMAN_MIRRORLIST}
-EOF
+	cat <<- EOF >> "${PACMAN_CONF}"
+	[multilib]
+	${PACMAN_MIRRORLIST}
+	EOF
 	fi
 	if [ "${ARCH_ARCH}" = "armv7h" -o "${ARCH_ARCH}" = "aarch64" ]; then
-		cat << EOF >> "${PACMAN_CONF}"
-[alarm]
-${PACMAN_MIRRORLIST}
-[aur]
-${PACMAN_MIRRORLIST}
-EOF
+		cat <<- EOF >> "${PACMAN_CONF}"
+		[alarm]
+		${PACMAN_MIRRORLIST}
+		[aur]
+		${PACMAN_MIRRORLIST}
+		EOF
 	fi
 
 	#fix error
@@ -601,14 +547,20 @@ EOF
 	if [ ! -z "${TARGET_QEMU}" ]; then
 		mkdir -p ${TARGET_OUTPUT}/usr/bin
 		cp extras/${TARGET_QEMU} ${TARGET_OUTPUT}/usr/bin/
+		chroot_cmd() {
+			QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve "${@}"
+		}
+	else
+		chroot_cmd() {
+			PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" "${@}"
+		}
 	fi
 
-	if [ "${TARGET_ARCH}" = "armhf" ] || [ "${TARGET_ARCH}" = "aarch64" ]; then
-		pacstrap -C ${PACMAN_CONF} -c -d -G -M "${TARGET_OUTPUT}" filesystem pacman shadow grep haveged
+	if [ ! -z "${TARGET_QEMU}" ]; then
+		pacstrap -C ${PACMAN_CONF} -c -d -G -M "${TARGET_OUTPUT}" filesystem pacman shadow grep haveged procps-ng
 
-		QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "/usr/bin/haveged ; /usr/bin/rm -fr /etc/pacman.d/gnupg ; /usr/bin/pacman-key --init ; /usr/bin/pacman-key --populate ${ARCH_KEYRING} ; /usr/bin/pkill haveged ; /usr/bin/pkill gpg-agent"
-
-		QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "/usr/bin/pacman -Suy --noconfirm ${PACMAN_BASE_PKGS} ${PACMAN_EXTRA_PKGS}"
+		chroot_cmd /bin/sh -c "/usr/bin/haveged ; /usr/bin/rm -fr /etc/pacman.d/gnupg ; /usr/bin/pacman-key --init ; /usr/bin/pacman-key --populate ${ARCH_KEYRING} ; /usr/bin/pkill haveged ; /usr/bin/pkill gpg-agent"
+		chroot_cmd /bin/sh -c "/usr/bin/pacman -Suy --noconfirm ${PACMAN_BASE_PKGS} ${PACMAN_EXTRA_PKGS}"
 	else
 		pacstrap -C ${PACMAN_CONF} -c -d -G -M "${TARGET_OUTPUT}" filesystem pacman shadow grep
 
@@ -624,33 +576,21 @@ EOF
 
 
 	#resolve
-	cat << EOF > ${TARGET_OUTPUT}/etc/resolv.conf
-nameserver 1.1.1.1
-nameserver 1.0.0.1
-EOF
+	cat <<- EOF > ${TARGET_OUTPUT}/etc/resolv.conf
+	nameserver 1.1.1.1
+	nameserver 1.0.0.1
+	EOF
 
 	#systemd-sysusers
 	if [ -e "${TARGET_OUTPUT}/usr/bin/systemd-sysusers" ]; then
-		if [ "${TARGET_ARCH}" = "armhf" ] || [ "${TARGET_ARCH}" = "aarch64" ]; then
-			QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "/usr/bin/systemd-sysusers"
-		else
-			PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /bin/sh -c "/usr/bin/systemd-sysusers"
-		fi
+		chroot_cmd /bin/sh -c "/usr/bin/systemd-sysusers"
 	fi
 
 	#update-ca-trust
-	if [ "${TARGET_ARCH}" = "armhf" ] || [ "${TARGET_ARCH}" = "aarch64" ]; then
-		QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "update-ca-trust"
-	else
-		PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /bin/sh -c "update-ca-trust"
-	fi
+	chroot_cmd /bin/sh -c "update-ca-trust"
 
 	#keyring
-	if [ "${TARGET_ARCH}" = "armhf" ] || [ "${TARGET_ARCH}" = "aarch64" ]; then
-		QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "/usr/bin/haveged ; /usr/bin/rm -fr /etc/pacman.d/gnupg ; /usr/bin/pacman-key --init ; /usr/bin/pacman-key --populate ${ARCH_KEYRING} ; /usr/bin/pkill haveged ; /usr/bin/pkill gpg-agent"
-	else
-		PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /bin/sh -c "/usr/bin/haveged ; /usr/bin/rm -fr /etc/pacman.d/gnupg ; /usr/bin/pacman-key --init ; /usr/bin/pacman-key --populate ${ARCH_KEYRING} ; /usr/bin/pkill haveged ; /usr/bin/pkill gpg-agent"
-	fi
+	chroot_cmd /bin/sh -c "/usr/bin/haveged ; /usr/bin/rm -fr /etc/pacman.d/gnupg ; /usr/bin/pacman-key --init ; /usr/bin/pacman-key --populate ${ARCH_KEYRING} ; /usr/bin/pkill haveged ; /usr/bin/pkill gpg-agent"
 
 	#basic config
 	echo "${PACMAN_MIRRORLIST}" > ${TARGET_OUTPUT}/etc/pacman.d/mirrorlist
@@ -658,24 +598,18 @@ EOF
 	sed -i "s/#\(NoUpgrade   =\)/\1 \/etc\/pacman.d\/mirrorlist/g" ${TARGET_OUTPUT}/etc/pacman.conf
 
 	#locale
-	sed -i "s/#en_US.UTF-8/en_US.UTF-8/g" ${TARGET_OUTPUT}/etc/locale.gen
-	sed -i "s/#${TARGET_LOCALE}/${TARGET_LOCALE}/g" ${TARGET_OUTPUT}/etc/locale.gen
-	if [ -e ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8 ]; then
-		rm -rf ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8
-	fi
-	if [ -e ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8.gz ]; then
-		gzip -dk ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8.gz
-	fi
-	if [ "${TARGET_ARCH}" = "armhf" ] || [ "${TARGET_ARCH}" = "aarch64" ]; then
-		QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "locale-gen"
-	else
-		PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /bin/sh -c "/usr/bin/locale-gen"
-	fi
+	#if [ -e ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8.gz ]; then
+	#	rm -rf ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8
+	#	gzip -dk ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8.gz
+	#fi
+	sed -i "s/#*[ ]*${TARGET_LOCALE}/${TARGET_LOCALE}/g" ${TARGET_OUTPUT}/etc/locale.gen
 	echo "LANG=${TARGET_LOCALE}" >> ${TARGET_OUTPUT}/etc/locale.conf
 	echo "LC_ALL=${TARGET_LOCALE}" >> ${TARGET_OUTPUT}/etc/locale.conf
+	chroot_cmd /bin/sh -c "locale-gen"
 
 	#timezone
 	if [ -e "${TARGET_OUTPUT}/usr/share/zoneinfo/${TARGET_TIMEZONE}" ]; then
+		rm -rf ${TARGET_OUTPUT}/etc/localtime
 		ln -sf /usr/share/zoneinfo/${TARGET_TIMEZONE} ${TARGET_OUTPUT}/etc/localtime
 	fi
 
@@ -686,35 +620,21 @@ EOF
 	if [ -e extras/package-query-*-${ARCH_ARCH}.pkg.tar.xz -a -e extras/yaourt-*-any.pkg.tar.xz ]; then
 		cp extras/package-query-*-${ARCH_ARCH}.pkg.tar.xz ${TARGET_OUTPUT}/
 		cp extras/yaourt-*-any.pkg.tar.xz ${TARGET_OUTPUT}/
-		if [ "${TARGET_ARCH}" = "armhf" ] || [ "${TARGET_ARCH}" = "aarch64" ]; then
-			QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "/usr/bin/pacman -Sy --noconfirm ; /usr/bin/pacman -U --noconfirm --asdeps /package-query-*; /usr/bin/pacman -U --noconfirm /yaourt-*-any.pkg.tar.xz"
-		else
-			PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /bin/sh -c "/usr/bin/pacman -Sy --noconfirm ; /usr/bin/pacman -U --noconfirm --asdeps /package-query-*; /usr/bin/pacman -U --noconfirm /yaourt-*-any.pkg.tar.xz"
-		fi
+		chroot_cmd /bin/sh -c "/usr/bin/pacman -Sy --noconfirm ; /usr/bin/pacman -U --noconfirm --asdeps /package-query-*; /usr/bin/pacman -U --noconfirm /yaourt-*-any.pkg.tar.xz"
 		rm -rf ${TARGET_OUTPUT}/*.pkg.tar.xz
 	fi
 
 	#makepkg
-	sed -i -e 's/(( EUID == 0 ))/false /g' /usr/bin/makepkg
+	[ -e /usr/bin/makepkg ] && sed -i -e 's/(( EUID == 0 ))/false /g' /usr/bin/makepkg
 
 	echo
 
+
 	echo "Clearing"
-
-	if [ ! -z "${PACMAN_REMOVE_PKGS}" ]; then
-		if [ "${TARGET_ARCH}" = "armhf" ] || [ "${TARGET_ARCH}" = "aarch64" ]; then
-			QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "/usr/bin/pacman -Rsn --noconfirm ${PACMAN_REMOVE_PKGS}"
-		else
-			PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /bin/sh -c /usr/bin/"pacman -Rsn --noconfirm ${PACMAN_REMOVE_PKGS}"
-		fi
-	fi
-
 	rm -rf "${PACMAN_CONF}"
-
-	rm -rf ${TARGET_OUTPUT}/var/cache/pacman/pkg/*
-	rm -rf ${TARGET_OUTPUT}/var/lib/pacman/sync/*
-	rm -rf ${TARGET_OUTPUT}/tmp/yaourt*
-
+	if [ ! -z "${PACMAN_REMOVE_PKGS}" ]; then
+		chroot_cmd /bin/sh -c /usr/bin/"pacman -Rsn --noconfirm ${PACMAN_REMOVE_PKGS}"
+	fi
 	echo
 
 	#fix error
@@ -727,21 +647,26 @@ fn_make_debian() {
 	local DEBIAN_DIST=${TARGET_EDITION}
 	if [ -z "${DEBIAN_DIST}" ]; then
 		#DEBIAN_DIST="$(curl -sSL http://ftp.kaist.ac.kr/debian/dists/README | grep '^stable,' | sed -e 's/^stable, or \([^ ]\+\)\s\+.*$/\1/g')"
-		#DEBIAN_DIST="${DEBIAN_DIST:-stretch}"
+		#DEBIAN_DIST="${DEBIAN_DIST:-sid}"
 		DEBIAN_DIST="${DEBIAN_DIST:-stable}"
 	fi
 	echo "Current version : ${DEBIAN_DIST}"
+
 	#local DEBIAN_MIRROR=http://ftp.kr.debian.org/debian
 	#local DEBIAN_MIRROR=http://ftp.daumkakao.com/debian
 	local DEBIAN_MIRROR=http://ftp.lanet.kr/debian
-	local DEBIAN_EXTRA=locales
+
+	local DEBIAN_EXTRA=""
+	#local DEBIAN_EXTRA=locales
 
 	local DEBIAN_ARCH=${TARGET_ARCH}
 	DEBIAN_ARCH=${DEBIAN_ARCH/x64/amd64}
 	DEBIAN_ARCH=${DEBIAN_ARCH/armv7h/armhf}
 	DEBIAN_ARCH=${DEBIAN_ARCH/aarch64/arm64}
 
-	fn_make_debian_common "${DEBIAN_DIST}" "${DEBIAN_MIRROR}" "${DEBIAN_EXTRA}" "${DEBIAN_ARCH}"
+	local DEBIAN_COMPONENTS="main contrib non-free"
+
+	fn_make_debian_common "${DEBIAN_DIST}" "${DEBIAN_MIRROR}" "${DEBIAN_EXTRA}" "${DEBIAN_ARCH}" "${DEBIAN_COMPONENTS}"
 }
 
 fn_make_ubuntu() {
@@ -751,24 +676,29 @@ fn_make_ubuntu() {
 		DEBIAN_DIST="${DEBIAN_DIST:-disco}"
 	fi
 	echo "Current version : ${DEBIAN_DIST}"
+
 	local DEBIAN_MIRROR=
-	#local DEBIAN_EXTRA="language-pack-ko"
-	local DEBIAN_EXTRA="locales,tzdata"
-
-	local DEBIAN_ARCH=${TARGET_ARCH}
-	DEBIAN_ARCH=${DEBIAN_ARCH/x64/amd64}
-	DEBIAN_ARCH=${DEBIAN_ARCH/armv7h/armhf}
-	DEBIAN_ARCH=${DEBIAN_ARCH/aarch64/arm64}
-
-	if [ "${DEBIAN_ARCH}" = "armhf" -o "${DEBIAN_ARCH}" = "arm64" ]; then
-		DEBIAN_MIRROR=http://ports.ubuntu.com/ubuntu-ports
+	if [ ! -z "${TARGET_QEMU}" ]; then
+		#DEBIAN_MIRROR=http://ports.ubuntu.com/ubuntu-ports
+		DEBIAN_MIRROR=https://mirrors.xtom.com.hk/ubuntu-ports
 	else
 		#DEBIAN_MIRROR=http://kr.archive.ubuntu.com/ubuntu
 		#DEBIAN_MIRROR=http://ftp.daumkakao.com/ubuntu
 		DEBIAN_MIRROR=http://ftp.lanet.kr/ubuntu
 	fi
 
-	fn_make_debian_common "${DEBIAN_DIST}" "${DEBIAN_MIRROR}" "${DEBIAN_EXTRA}" "${DEBIAN_ARCH}"
+	local DEBIAN_EXTRA=""
+	#local DEBIAN_EXTRA="language-pack-ko"
+	#local DEBIAN_EXTRA="locales,tzdata"
+
+	local DEBIAN_ARCH=${TARGET_ARCH}
+	DEBIAN_ARCH=${DEBIAN_ARCH/x64/amd64}
+	DEBIAN_ARCH=${DEBIAN_ARCH/armv7h/armhf}
+	DEBIAN_ARCH=${DEBIAN_ARCH/aarch64/arm64}
+
+	local DEBIAN_COMPONENTS="main universe restricted multiverse"
+
+	fn_make_debian_common "${DEBIAN_DIST}" "${DEBIAN_MIRROR}" "${DEBIAN_EXTRA}" "${DEBIAN_ARCH}" "${DEBIAN_COMPONENTS}"
 }
 
 fn_make_debian_common() {
@@ -778,137 +708,143 @@ fn_make_debian_common() {
 		apk add debootstrap
 	fi
 
-	alias apt-get="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin LANG=C LC_ALL=C DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true /usr/bin/apt-get -o Acquire::Languages=none -o Acquire::GzipIndexes=true -o Acquire::CompressionTypes::Order::=gz -o APT::Install-Recommends=false -o APT::Install-Suggests=false" 
-	alias debootstrap="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin LANG=C LC_ALL=C DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true /usr/bin/debootstrap -o Acquire::Languages=none -o Acquire::GzipIndexes=true -o Acquire::CompressionTypes::Order::=gz -o APT::Install-Recommends=false -o APT::Install-Suggests=false"
-
 	local DEBIAN_DIST="${1}"
 	local DEBIAN_MIRROR="${2}"
 	local DEBIAN_EXTRA=("${3}")
 	local DEBIAN_ARCH=("${4}")
+	local DEBIAN_COMPONENTS="${5:-main}"
 	local DEBIAN_OPTION=("--variant=minbase")
 	if [ ! -z "${DEBIAN_EXTRA}" ]; then
-		DEBIAN_OPTION=("${DEBIAN_OPTION[@]}" "--include=${DEBIAN_EXTRA}")
+		DEBIAN_OPTION=("${DEBIAN_OPTION[@]}" "--include=busybox,locales,${DEBIAN_EXTRA}")
+	else
+		DEBIAN_OPTION=("${DEBIAN_OPTION[@]}" "--include=busybox,locales")
 	fi
-	DEBIAN_OPTION=("--arch=${DEBIAN_ARCH}" "${DEBIAN_OPTION[@]}")
+	DEBIAN_OPTION=("${DEBIAN_OPTION[@]}" "--components=${DEBIAN_COMPONENTS// /,}")
+	DEBIAN_OPTION=("${DEBIAN_OPTION[@]}" "--merged-usr")
+	DEBIAN_OPTION=("--arch=${DEBIAN_ARCH}" "${DEBIAN_OPTION[@]}" "--exclude=bsdutils,e2fslibs,e2fsprogs,grep,gzip,libcomerr2,lsb-base,mount,sed,sysvinit-utils")
 
+	#Copy qemu
 	if [ ! -z "${TARGET_QEMU}" ]; then
 		mkdir -p "${TARGET_OUTPUT}/usr/bin"
 		cp extras/${TARGET_QEMU} ${TARGET_OUTPUT}/usr/bin/
 
-		echo "debootstrap 1st"
-		PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true debootstrap --foreign ${DEBIAN_OPTION[@]} ${DEBIAN_DIST} "${TARGET_OUTPUT}" ${DEBIAN_MIRROR}
-
-		echo "debootstrap 2nd"
-		if [ "${TARGET_ARCH}" = "armhf" ] || [ "${TARGET_ARCH}" = "aarch64" ]; then
-			QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "/debootstrap/debootstrap --second-stage"
-		else
-			PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true chroot "${TARGET_OUTPUT}" /bin/sh -c "/debootstrap/debootstrap --second-stage"
-		fi
-
-		echo "debootstrap 3rd"
-		if [ "${TARGET_ARCH}" = "armhf" ] || [ "${TARGET_ARCH}" = "aarch64" ]; then
-			QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "/usr/bin/dpkg --configure -a"
-		else
-			PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true chroot "${TARGET_OUTPUT}" /bin/sh -c "/usr/bin/dpkg --configure -a"
-		fi
+		chroot_cmd() {
+			QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve "${@}"
+		}
 	else
-		echo "debootstrap"
-		PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C DEBIAN_FRONTEND=noninteractive debootstrap ${DEBIAN_OPTION[@]} ${DEBIAN_DIST} "${TARGET_OUTPUT}" ${DEBIAN_MIRROR}
+		chroot_cmd() {
+			PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true chroot "${TARGET_OUTPUT}" "${@}"
+		}
 	fi
+
+	#debootstrap 1st
+	echo "debootstrap 1st"
+	PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true debootstrap --foreign ${DEBIAN_OPTION[@]} ${DEBIAN_DIST} "${TARGET_OUTPUT}" ${DEBIAN_MIRROR}
+
+	#Fetch busybox
+	echo "fetch busybox"
+	local url==""
+	if [ "${TARGET_DISTRO}" = "debian" ]; then
+		url="$(wget ${DEBIAN_MIRROR}/dists/${DEBIAN_DIST}/main/binary-${DEBIAN_ARCH}/Packages.gz -q -O - | zcat | grep "Filename: pool/.*/.*/.*/busybox_.*.deb" | sort -V | tail -1 | sed -e 's/Filename: //g')"
+	elif [ "${TARGET_DISTRO}" = "ubuntu" ]; then
+		url="$(wget ${DEBIAN_MIRROR}/dists/${DEBIAN_DIST}/universe/binary-${DEBIAN_ARCH}/Packages.gz -q -O - | zcat | grep "Filename: pool/.*/.*/.*/busybox_.*.deb" | sort -V | tail -1 | sed -e 's/Filename: //g')"
+	fi
+	echo ${url} ${DEBIAN_MIRROR}/${url}
+	mkdir ${TARGET_OUTPUT}/busybox
+	wget ${DEBIAN_MIRROR}/${url} -q -O ${TARGET_OUTPUT}/busybox/busybox.deb
+	chroot_cmd /bin/sh -c "dpkg-deb -x /busybox/busybox.deb /busybox ; /busybox/bin/busybox cp /busybox/bin/busybox /bin/ ; /bin/busybox --install -s"
+	rm -rf ${TARGET_OUTPUT}/busybox
+
+	echo "${TARGET_TIMEZONE}" > ${TARGET_OUTPUT}/etc/timezone
+
+	#debootstrap 2nd
+	echo "debootstrap 2nd"
+	chroot_cmd /bin/sh -c "/debootstrap/debootstrap --second-stage"
+
+	#debootstrap 3rd
+	echo "debootstrap 3rd"
+	chroot_cmd /bin/sh -c "/usr/bin/dpkg --configure -a"
 
 	#resolve
-	cat << EOF > ${TARGET_OUTPUT}/etc/resolv.conf
-nameserver 1.1.1.1
-nameserver 1.0.0.1
-EOF
-
-	#locale
-	sed -i "s/# en_US.UTF-8/en_US.UTF-8/g" ${TARGET_OUTPUT}/etc/locale.gen
-	sed -i "s/# ${TARGET_LOCALE}/${TARGET_LOCALE}/g" ${TARGET_OUTPUT}/etc/locale.gen
-	if [ -e ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8 ]; then
-		rm -rf ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8
-	fi
-	if [ -e ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8.gz ]; then
-		gzip -dk ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8.gz
-	fi
-	if [ "${TARGET_ARCH}" = "armhf" ] || [ "${TARGET_ARCH}" = "aarch64" ]; then
-		QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "/usr/sbin/locale-gen"
-	else
-		PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C chroot "${TARGET_OUTPUT}" /bin/sh -c "/usr/sbin/locale-gen"
-	fi
-	echo "LANG=${TARGET_LOCALE}" >> ${TARGET_OUTPUT}/etc/default/locale
-	echo "LANGUAGE=${TARGET_LOCALE}" >> ${TARGET_OUTPUT}/etc/default/locale
-	echo "LC_ALL=${TARGET_LOCALE}" >> ${TARGET_OUTPUT}/etc/default/locale
-
-	#timezone
-	if [ -e "${TARGET_OUTPUT}/usr/share/zoneinfo/${TARGET_TIMEZONE}" ]; then
-		ln -sf /usr/share/zoneinfo/${TARGET_TIMEZONE} ${TARGET_OUTPUT}/etc/localtime
-		echo "${TARGET_TIMEZONE}" > ${TARGET_OUTPUT}/etc/timezone
-	fi
-
-	#skel
-	cp -ar ${TARGET_OUTPUT}/etc/skel/. ${TARGET_OUTPUT}/root/
+	echo "resolv.conf"
+	cat <<- EOF > ${TARGET_OUTPUT}/etc/resolv.conf
+	nameserver 1.1.1.1
+	nameserver 1.0.0.1
+	EOF
 
 	#Mirror
+	echo "mirror"
 	if [ "${TARGET_DISTRO}" = "debian" ]; then
-		#echo "deb http://security.debian.org/ ${DEBIAN_DIST}/updates main" >> ${TARGET_OUTPUT}/etc/apt/sources.list
-		#cat <<- EOF > ${TARGET_OUTPUT}/etc/apt/sources.list
-		#deb ${DEBIAN_MIRROR} ${DEBIAN_DIST} main contrib non-free
-		## deb-src ${DEBIAN_MIRROR} ${DEBIAN_DIST} main contrib non-free
-
-		#deb ${DEBIAN_MIRROR} ${DEBIAN_DIST}-updates main contrib non-free
-		## deb-src ${DEBIAN_MIRROR} ${DEBIAN_DIST}-updates main contrib non-free
-
-		##deb ${DEBIAN_MIRROR} ${DEBIAN_DIST}-proposed-updates main contrib non-free
-		### deb-src ${DEBIAN_MIRROR} ${DEBIAN_DIST}-proposed-updates main contrib non-free
-
-		##deb ${DEBIAN_MIRROR} ${DEBIAN_DIST}-backports main contrib non-free
-		### deb-src ${DEBIAN_MIRROR} ${DEBIAN_DIST}-backports main contrib non-free
-
-		#deb http://security.debian.org ${DEBIAN_DIST}/updates main contrib non-free
-		## deb-src http://security.debian.org ${DEBIAN_DIST}/updates main contrib non-free
-		#EOF
 		cat <<- EOF > ${TARGET_OUTPUT}/etc/apt/sources.list
-		deb ${DEBIAN_MIRROR} ${DEBIAN_DIST} main
-		# deb-src ${DEBIAN_MIRROR} ${DEBIAN_DIST} main
+		deb ${DEBIAN_MIRROR} ${DEBIAN_DIST} ${DEBIAN_COMPONENTS}
+		# deb-src ${DEBIAN_MIRROR} ${DEBIAN_DIST} ${DEBIAN_COMPONENTS}
 
-		deb ${DEBIAN_MIRROR} ${DEBIAN_DIST}-updates main
-		# deb-src ${DEBIAN_MIRROR} ${DEBIAN_DIST}-updates main
+		$([ "${DEBIAN_DIST}" = "sid" ] && echo "#")deb ${DEBIAN_MIRROR} ${DEBIAN_DIST}-updates ${DEBIAN_COMPONENTS}
+		$([ "${DEBIAN_DIST}" = "sid" ] && echo "#")# deb-src ${DEBIAN_MIRROR} ${DEBIAN_DIST}-updates ${DEBIAN_COMPONENTS}
 
-		deb http://security.debian.org ${DEBIAN_DIST}/updates main
-		# deb-src http://security.debian.org ${DEBIAN_DIST}/updates main
+		#deb ${DEBIAN_MIRROR} ${DEBIAN_DIST}-proposed-updates ${DEBIAN_COMPONENTS}
+		## deb-src ${DEBIAN_MIRROR} ${DEBIAN_DIST}-proposed-updates ${DEBIAN_COMPONENTS}
+
+		#deb ${DEBIAN_MIRROR} ${DEBIAN_DIST}-backports ${DEBIAN_COMPONENTS}
+		## deb-src ${DEBIAN_MIRROR} ${DEBIAN_DIST}-backports ${DEBIAN_COMPONENTS}
+
+		$([ "${DEBIAN_DIST}" = "sid" ] && echo "#")deb http://security.debian.org ${DEBIAN_DIST}/updates ${DEBIAN_COMPONENTS}
+		$([ "${DEBIAN_DIST}" = "sid" ] && echo "#")# deb-src http://security.debian.org ${DEBIAN_DIST}/updates ${DEBIAN_COMPONENTS}
 		EOF
+		#cat <<- EOF > ${TARGET_OUTPUT}/etc/apt/sources.list
+		#deb ${DEBIAN_MIRROR} ${DEBIAN_DIST} main
+		## deb-src ${DEBIAN_MIRROR} ${DEBIAN_DIST} main
+
+		#deb ${DEBIAN_MIRROR} ${DEBIAN_DIST}-updates main
+		## deb-src ${DEBIAN_MIRROR} ${DEBIAN_DIST}-updates main
+
+		#deb http://security.debian.org ${DEBIAN_DIST}/updates main
+		## deb-src http://security.debian.org ${DEBIAN_DIST}/updates main
+		#EOF
 	fi
 	if [ "${TARGET_DISTRO}" = "ubuntu" ]; then
-		#sed -i "s/ ${DEBIAN_DIST} main$/ ${DEBIAN_DIST} main universe/; p; s/ ${DEBIAN_DIST} main/ ${DEBIAN_DIST}-updates main/; p; s/ ${DEBIAN_DIST}-updates main/ ${DEBIAN_DIST}-security main/" ${TARGET_OUTPUT}/etc/apt/sources.list
-		#cat <<- EOF > ${TARGET_OUTPUT}/etc/apt/sources.list
-		#deb ${DEBIAN_MIRROR} ${DEBIAN_DIST} main universe restricted multiverse
-		## deb-src ${DEBIAN_MIRROR} ${DEBIAN_DIST} main universe restricted multiverse
-		#
-		#deb ${DEBIAN_MIRROR} ${DEBIAN_DIST}-updates main universe restricted multiverse
-		## deb-src ${DEBIAN_MIRROR} ${DEBIAN_DIST}-updates main universe restricted multiverse
-		#
-		##deb ${DEBIAN_MIRROR} ${DEBIAN_DIST}-proposed main universe restricted multiverse
-		### deb-src ${DEBIAN_MIRROR} ${DEBIAN_DIST}-proposed main universe restricted multiverse
-		#
-		##deb ${DEBIAN_MIRROR} ${DEBIAN_DIST}-backports main universe restricted multiverse
-		### deb-src ${DEBIAN_MIRROR} ${DEBIAN_DIST}-backports main universe restricted multiverse
-		#
-		#deb ${DEBIAN_MIRROR} ${DEBIAN_DIST}-security main universe restricted multiverse
-		## deb-src ${DEBIAN_MIRROR} ${DEBIAN_DIST}-security main universe restricted multiverse
-		#EOF
 		cat <<- EOF > ${TARGET_OUTPUT}/etc/apt/sources.list
-		deb ${DEBIAN_MIRROR} ${DEBIAN_DIST} main restricted universe
-		# deb-src ${DEBIAN_MIRROR} ${DEBIAN_DIST} main restricted universe
+		deb ${DEBIAN_MIRROR} ${DEBIAN_DIST} ${DEBIAN_COMPONENTS}
+		# deb-src ${DEBIAN_MIRROR} ${DEBIAN_DIST} ${DEBIAN_COMPONENTS}
 
-		deb ${DEBIAN_MIRROR} ${DEBIAN_DIST}-updates main restricted universe
-		# deb-src ${DEBIAN_MIRROR} ${DEBIAN_DIST}-updates main restricted universe
+		deb ${DEBIAN_MIRROR} ${DEBIAN_DIST}-updates ${DEBIAN_COMPONENTS}
+		# deb-src ${DEBIAN_MIRROR} ${DEBIAN_DIST}-updates ${DEBIAN_COMPONENTS}
 
-		deb ${DEBIAN_MIRROR} ${DEBIAN_DIST}-security main restricted universe
-		# deb-src ${DEBIAN_MIRROR} ${DEBIAN_DIST}-security main restricted universe
+		#deb ${DEBIAN_MIRROR} ${DEBIAN_DIST}-proposed ${DEBIAN_COMPONENTS}
+		## deb-src ${DEBIAN_MIRROR} ${DEBIAN_DIST}-proposed ${DEBIAN_COMPONENTS}
+
+		#deb ${DEBIAN_MIRROR} ${DEBIAN_DIST}-backports ${DEBIAN_COMPONENTS}
+		## deb-src ${DEBIAN_MIRROR} ${DEBIAN_DIST}-backports ${DEBIAN_COMPONENTS}
+
+		deb ${DEBIAN_MIRROR} ${DEBIAN_DIST}-security ${DEBIAN_COMPONENTS}
+		# deb-src ${DEBIAN_MIRROR} ${DEBIAN_DIST}-security ${DEBIAN_COMPONENTS}
 		EOF
+		#cat <<- EOF > ${TARGET_OUTPUT}/etc/apt/sources.list
+		#deb ${DEBIAN_MIRROR} ${DEBIAN_DIST} main restricted universe
+		## deb-src ${DEBIAN_MIRROR} ${DEBIAN_DIST} main restricted universe
+
+		#deb ${DEBIAN_MIRROR} ${DEBIAN_DIST}-updates main restricted universe
+		## deb-src ${DEBIAN_MIRROR} ${DEBIAN_DIST}-updates main restricted universe
+
+		#deb ${DEBIAN_MIRROR} ${DEBIAN_DIST}-security main restricted universe
+		## deb-src ${DEBIAN_MIRROR} ${DEBIAN_DIST}-security main restricted universe
+		#EOF
 	fi
 
+	#docker
+	mkdir -p ${TARGET_OUTPUT}/run/systemd
+	echo 'docker' > ${TARGET_OUTPUT}/run/systemd/container
+
+	# https://github.com/docker/docker/blob/9a9fc01af8fb5d98b8eec0740716226fadb3735c/contrib/mkimage/debootstrap#L40-L48
+	echo '#!/bin/sh' > ${TARGET_OUTPUT}/usr/sbin/policy-rc.d
+	echo 'exit 101' >> ${TARGET_OUTPUT}/usr/sbin/policy-rc.d
+	chmod +x ${TARGET_OUTPUT}/usr/sbin/policy-rc.d
+
+	# https://github.com/docker/docker/blob/9a9fc01af8fb5d98b8eec0740716226fadb3735c/contrib/mkimage/debootstrap#L54-L56
+	chroot_cmd /bin/sh -c "dpkg-divert --local --rename --add /sbin/initctl ; cp -a /usr/sbin/policy-rc.d /sbin/initctl ; sed -i 's/^exit.*/exit 0/' /sbin/initctl"
+
+	#apt
+	echo "apt"
 	if strings "${TARGET_OUTPUT}/usr/bin/dpkg" | grep -q unsafe-io; then
 		# force dpkg not to call sync() after package extraction (speeding up installs)
 		cat > "${TARGET_OUTPUT}/etc/dpkg/dpkg.cfg.d/docker-apt-speedup" <<-'EOF'
@@ -918,7 +854,7 @@ EOF
 
 	if [ -d "${TARGET_OUTPUT}/etc/apt/apt.conf.d" ]; then
 		# _keep_ us lean by effectively running "apt-get clean" after every install
-		aptGetClean='"rm -f /var/cache/apt/archives/*.deb /var/cache/apt/archives/partial/*.deb /var/cache/apt/*.bin || true";'
+		aptGetClean='"rm -f /core /*.core /var/cache/apt/archives/*.deb /var/cache/apt/archives/partial/*.deb /var/cache/apt/*.bin || true";'
 		cat > "${TARGET_OUTPUT}/etc/apt/apt.conf.d/docker-clean" <<-EOF
 		DPkg::Post-Invoke { ${aptGetClean} };
 		APT::Update::Post-Invoke { ${aptGetClean} };
@@ -940,16 +876,46 @@ EOF
 		Acquire::CompressionTypes::Order:: "gz";
 		EOF
 
-		cat > "${TARGET_OUTPUT}/etc/apt/apt.conf.d/docker-gzip-indexes" <<-'EOF'
-		Acquire::GzipIndexes "true";
-		Acquire::CompressionTypes::Order:: "gz";
-		EOF
-
-
-		cat > "${TARGET_OUTPUT}/etc/apt/apt.conf.d/docker-recommends-suggests" <<-'EOF'
+		cat > "${TARGET_OUTPUT}/etc/apt/apt.conf.d/docker-autoremove-recommends-suggests" <<- 'EOF'
 		APT::Install-Recommends "false";
 		APT::Install-Suggests "false";
 		EOF
+	fi
+	cat <<- EOF > "${TARGET_OUTPUT}/etc/profile.d/debconf.sh"
+	export DEBIAN_FRONTEND=noninteractive
+	export DEBCONF_NONINTERACTIVE_SEEN=true
+	EOF
+	chmod 755 "${TARGET_OUTPUT}/etc/profile.d/debconf.sh"
+
+	#skel
+	if [ -e ${TARGET_OUTPUT}/etc/skel ]; then
+		cp -ar ${TARGET_OUTPUT}/etc/skel/. ${TARGET_OUTPUT}/root/
+	fi
+
+	#locale
+	if [ -e "${TARGET_OUTPUT}/usr/sbin/locale-gen" ]; then
+		sed -i "s/#*[ ]*${TARGET_LOCALE}/${TARGET_LOCALE}/g" ${TARGET_OUTPUT}/etc/locale.gen
+		#if [ -e ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8.gz ]; then
+		#	rm -rf ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8
+		#	gzip -dk ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8.gz
+		#fi
+		chroot_cmd /bin/sh -c "/usr/sbin/locale-gen"
+		echo "LANG=${TARGET_LOCALE}" >> ${TARGET_OUTPUT}/etc/default/locale
+		echo "LANGUAGE=${TARGET_LOCALE}" >> ${TARGET_OUTPUT}/etc/default/locale
+		echo "LC_ALL=${TARGET_LOCALE}" >> ${TARGET_OUTPUT}/etc/default/locale
+	fi
+
+	#timezone
+	echo "${TARGET_TIMEZONE}" > ${TARGET_OUTPUT}/etc/timezone
+	if [ -e ${TARGET_OUTPUT}/usr/share/zoneinfo/${TARGET_TIMEZONE} ]; then
+		rm -rf ${TARGET_OUTPUT}/etc/localtime
+		ln -s /usr/share/zoneinfo/${TARGET_TIMEZONE} ${TARGET_OUTPUT}/etc/localtime
+	elif [ -e /usr/share/zoneinfo/${TARGET_TIMEZONE} ]; then
+		rm -rf ${TARGET_OUTPUT}/etc/localtime
+		cat /usr/share/zoneinfo/${TARGET_TIMEZONE} > ${TARGET_OUTPUT}/etc/localtime
+	elif [ -e /etc/zoneinfo/${TARGET_TIMEZONE} ]; then
+		rm -rf ${TARGET_OUTPUT}/etc/localtime
+		cat /etc/zoneinfo/${TARGET_TIMEZONE} > ${TARGET_OUTPUT}/etc/localtime
 	fi
 
 	fn_make_common
@@ -962,10 +928,10 @@ fn_make_common() {
 fn_update() {
 	echo "Update"
 	#resolve
-	cat << EOF > ${TARGET_OUTPUT}/etc/resolv.conf
-nameserver 1.1.1.1
-nameserver 1.0.0.1
-EOF
+	cat <<- EOF > ${TARGET_OUTPUT}/etc/resolv.conf
+	nameserver 1.1.1.1
+	nameserver 1.0.0.1
+	EOF
 
 
 	mkdir -p ${TARGET_OUTPUT}/usr/bin ${TARGET_OUTPUT}/usr/sbin ${TARGET_OUTPUT}/usr/local/bin ${TARGET_OUTPUT}/usr/local/sbin
@@ -976,13 +942,6 @@ EOF
 	#qemu
 	if [ ! -z "${TARGET_QEMU}" ]; then
 		cp -f extras/${TARGET_QEMU} "${TARGET_OUTPUT}/usr/bin/"
-	fi
-
-	if [ -e ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8 ]; then
-		rm -rf ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8
-	fi
-	if [ -e ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8.gz ]; then
-		gzip -dk ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8.gz
 	fi
 
 	#docker-run
@@ -1002,41 +961,23 @@ EOF
 		mount -o bind ${TARGET_OUTPUT} ${TARGET_OUTPUT}
 	elif [ -e "${TARGET_OUTPUT}/etc/os-release" -a ! -z "$(grep "ID=\(debian\|ubuntu\)" "${TARGET_OUTPUT}/etc/os-release")" ]; then
 		cp -f extras/docker-install.deb ${TARGET_OUTPUT}/usr/local/bin/docker-install
+	elif [ -e "${TARGET_OUTPUT}/etc/os-release" -a ! -z "$(grep "ID=busybox" "${TARGET_OUTPUT}/etc/os-release")" ]; then
+		cp -f extras/docker-install.busybox ${TARGET_OUTPUT}/usr/local/bin/docker-install
 	fi
-	rm -rf ${TARGET_OUTPUT}/usr/local/bin/docker-su
-	#cp extras/docker-su ${TARGET_OUTPUT}/usr/local/bin/docker-su
 
 	#docker-build
 	if [ "${TARGET_ARCH}" = "armhf" ]; then
 		cp -f extras/docker-build-arm "${TARGET_OUTPUT}/usr/local/bin/"
 		ln -sf docker-build-arm "${TARGET_OUTPUT}/usr/local/bin/docker-build-start"
 		ln -sf docker-build-arm "${TARGET_OUTPUT}/usr/local/bin/docker-build-end"
-		rm -rf ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check
-		rm -rf ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check.sh
-		#if [ -e ${TARGET_OUTPUT}/lib/ld-musl-armhf.so.1 ]; then
-		#	cp extras/docker-execve-check.armv7h.musl ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check
-		#else
-		#	cp extras/docker-execve-check.armv7h.glibc ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check
-		#fi
-		#cp extras/docker-execve-check.sh ${TARGET_OUTPUT}/usr/local/bin/
 	elif [ "${TARGET_ARCH}" = "aarch64" ]; then
 		cp -f extras/docker-build-aarch64 "${TARGET_OUTPUT}/usr/local/bin/"
 		ln -sf docker-build-aarch64 "${TARGET_OUTPUT}/usr/local/bin/docker-build-start"
 		ln -sf docker-build-aarch64 "${TARGET_OUTPUT}/usr/local/bin/docker-build-end"
-		rm -rf ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check
-		rm -rf ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check.sh
-		#if [ -e ${TARGET_OUTPUT}/lib/ld-musl-aarch64.so.1 ]; then
-		#	cp extras/docker-execve-check.aarch64.musl ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check
-		#else
-		#	cp extras/docker-execve-check.aarch64.glibc ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check
-		#fi
-		#cp extras/docker-execve-check.sh ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check.sh
 	else
 		cp -f extras/docker-build-x64 "${TARGET_OUTPUT}/usr/local/bin/docker-build"
 		ln -sf docker-build "${TARGET_OUTPUT}/usr/local/bin/docker-build-start"
 		ln -sf docker-build "${TARGET_OUTPUT}/usr/local/bin/docker-build-end"
-		rm -rf ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check
-		#cp extras/docker-execve-check.sh ${TARGET_OUTPUT}/usr/local/bin/docker-execve-check
 	fi
 
 	#docker-adduser
@@ -1045,63 +986,14 @@ EOF
 	#docker-chown
 	cp -f extras/docker-chown ${TARGET_OUTPUT}/usr/local/bin/docker-chown
 
-	#docker-download
-	rm -rf ${TARGET_OUTPUT}/usr/local/bin/docker-download
-	#cp -f extras/docker-download ${TARGET_OUTPUT}/usr/local/bin/docker-download
 
-	#su-exec
-	rm -rf ${TARGET_OUTPUT}/usr/local/bin/su-exec
-	#if [ "${TARGET_ARCH}" = "armhf" ]; then
-	#	if [ -e ${TARGET_OUTPUT}/lib/ld-musl-armhf.so.1 ]; then
-	#		cp extras/su-exec-musl-armv7h ${TARGET_OUTPUT}/usr/local/bin/su-exec
-	#	else
-	#		cp extras/su-exec-glibc-armv7h ${TARGET_OUTPUT}/usr/local/bin/su-exec
-	#	fi
-	#elif [ "${TARGET_ARCH}" = "aarch64" ]; then
-	#	if [ -e ${TARGET_OUTPUT}/lib/ld-musl-aarch64.so.1 ]; then
-	#		cp extras/su-exec-musl-aarch64 ${TARGET_OUTPUT}/usr/local/bin/su-exec
-	#	else
-	#		cp extras/su-exec-glibc-aarch64 ${TARGET_OUTPUT}/usr/local/bin/su-exec
-	#	fi
-	#else
-	#	if [ -e ${TARGET_OUTPUT}/lib/ld-musl-x86_64.so.1 ]; then
-	#		cp extras/su-exec-musl-x64 ${TARGET_OUTPUT}/usr/local/bin/su-exec
-	#	else
-	#		cp extras/su-exec-glibc-x64 ${TARGET_OUTPUT}/usr/local/bin/su-exec
-	#	fi
-	#fi
-
-	#goreman
-	rm -rf ${TARGET_OUTPUT}/usr/local/bin/goreman
-	#if [ "${TARGET_ARCH}" = "armhf" ]; then
-	#	if [ -e ${TARGET_OUTPUT}/lib/ld-musl-armhf.so.1 ]; then
-	#		cp extras/goreman-musl-armv7h ${TARGET_OUTPUT}/usr/local/bin/goreman
-	#	else
-	#		cp extras/goreman-glibc-armv7h ${TARGET_OUTPUT}/usr/local/bin/goreman
-	#	fi
-	#elif [ "${TARGET_ARCH}" = "aarch64" ]; then
-	#	if [ -e ${TARGET_OUTPUT}/lib/ld-musl-aarch64.so.1 ]; then
-	#		cp extras/goreman-musl-aarch64 ${TARGET_OUTPUT}/usr/local/bin/goreman
-	#	else
-	#		cp extras/goreman-glibc-aarch64 ${TARGET_OUTPUT}/usr/local/bin/goreman
-	#	fi
-	#else
-	#	if [ -e ${TARGET_OUTPUT}/lib/ld-musl-x86_64.so.1 ]; then
-	#		cp extras/goreman-musl-x64 ${TARGET_OUTPUT}/usr/local/bin/goreman
-	#	else
-	#		cp extras/goreman-glibc-x64 ${TARGET_OUTPUT}/usr/local/bin/goreman
-	#	fi
-	#fi
-
-	if [ -e ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8 ]; then
-		rm -rf ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8
-	fi
-	if [ -e ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8.gz ]; then
-		gzip -dk ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8.gz
-	fi
-
-	#archlinux term fix
+	#archlinux fix
 	if [ -e "${TARGET_OUTPUT}/etc/arch-release" ]; then
+		if [ -e ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8.gz ]; then
+			rm -rf ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8
+			gzip -dk ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8.gz
+		fi
+
 		if [ ! -z "$(find ${TARGET_OUTPUT}/usr/share/terminfo/ 2> /dev/null | grep '_ADMIN_')" ]; then
 			for t in ${TARGET_OUTPUT}/usr/share/terminfo/*_ADMIN_*
 			do
@@ -1132,9 +1024,12 @@ EOF
 			prev_md5=$(tar -cf - ${TARGET_OUTPUT}/var/lib/dpkg/info 2> /dev/null | md5sum | cut -f 1 -d ' ')
 			PATH_CHROOT="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 			rm -rf ${TARGET_OUTPUT}/var/lib/apt/lists/lock
+		elif [ -e "${TARGET_OUTPUT}/etc/os-release" -a ! -z "$(grep "ID=busybox" "${TARGET_OUTPUT}/etc/os-release")" ]; then
+			prev_md5=$(md5sum ${TARGET_OUTPUT}/bin/busybox.static | cut -f 1 -d ' ')
+			PATH_CHROOT=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 		fi
-		
-		if [ "${TARGET_ARCH}" = "armhf" ] || [ "${TARGET_ARCH}" = "aarch64" ]; then
+
+		if [ ! -z "${TARGET_QEMU}" ]; then
 			QEMU_EXECVE=1 PATH="${PATH_CHROOT}" LANG=C LC_ALL=C ${CHROOT_CMD} "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "docker-install -r -u -c"
 		else
 			PATH="${PATH_CHROOT}" LANG=C LC_ALL=C ${CHROOT_CMD} "${TARGET_OUTPUT}" /bin/sh -c "docker-install -r -u -c"
@@ -1158,7 +1053,6 @@ EOF
 			fi
 		fi
 
-
 		if [ -e "${TARGET_OUTPUT}/etc/alpine-release" ]; then
 			post_md5=$(md5sum ${TARGET_OUTPUT}/lib/apk/db/installed | cut -f 1 -d ' ')
 		elif [ -e "${TARGET_OUTPUT}/opt/bin/opkg" ]; then
@@ -1169,6 +1063,8 @@ EOF
 			post_md5=$(tar -cf - ${TARGET_OUTPUT}/var/lib/dpkg/info 2> /dev/null | md5sum | cut -f 1 -d ' ')
 		elif [ -e "${TARGET_OUTPUT}/etc/os-release" -a ! -z "$(grep "ID=ubuntu" "${TARGET_OUTPUT}/etc/os-release")" ]; then
 			post_md5=$(tar -cf - ${TARGET_OUTPUT}/var/lib/dpkg/info 2> /dev/null | md5sum | cut -f 1 -d ' ')
+		elif [ -e "${TARGET_OUTPUT}/etc/os-release" -a ! -z "$(grep "ID=busybox" "${TARGET_OUTPUT}/etc/os-release")" ]; then
+			post_md5=$(md5sum ${TARGET_OUTPUT}/bin/busybox.static | cut -f 1 -d ' ')
 		fi
 		echo
 
@@ -1185,14 +1081,9 @@ EOF
 	fi
 
 	#clean
-	#if [ -e "${TARGET_OUTPUT}/etc/os-release"  ]; then
-	#	if [ ! -z "$(grep 'ID=\(debian\|ubuntu\)' "${TARGET_OUTPUT}/etc/os-release")" ]; then
-	#		find ${TARGET_OUTPUT}/var -name \*.log -o -name \*-old -exec rm -rf "{}" \;
-	#	fi
-	#fi
 	find ${TARGET_OUTPUT}/var -name \*.log -o -name \*-old -exec rm -rf "{}" \;
 
-	rm -rf ${TARGET_OUTPUT}/qemu_*.core
+	rm -rf ${TARGET_OUTPUT}/core ${TARGET_OUTPUT}/*.core
 
 	if [ -e "${TARGET_OUTPUT}/etc/arch-release" ]; then
 		mount -o bind "${TARGET_OUTPUT}" "${TARGET_OUTPUT}"
@@ -1328,7 +1219,7 @@ fi
 
 #set default
 #TARGET_DISTRO="${TARGET_DISTRO:-arch}"
-if [ "${TARGET_DISTRO}" != "alpine" -a "${TARGET_DISTRO}" != "arch" -a "${TARGET_DISTRO}" != "debian" -a "${TARGET_DISTRO}" != "ubuntu" -a "${TARGET_DISTRO}" != "entware" ]; then
+if [ "${TARGET_DISTRO}" != "alpine" -a "${TARGET_DISTRO}" != "arch" -a "${TARGET_DISTRO}" != "debian" -a "${TARGET_DISTRO}" != "ubuntu" -a "${TARGET_DISTRO}" != "entware" -a "${TARGET_DISTRO}" != "busybox" ]; then
 	fn_usage
 fi
 if [ -z "${TARGET_ARCH}" -o "${TARGET_ARCH}" = "x86_64" ]; then
