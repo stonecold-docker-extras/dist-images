@@ -648,7 +648,7 @@ fn_make_debian() {
 	if [ -z "${DEBIAN_DIST}" ]; then
 		#DEBIAN_DIST="$(curl -sSL http://ftp.kaist.ac.kr/debian/dists/README | grep '^stable,' | sed -e 's/^stable, or \([^ ]\+\)\s\+.*$/\1/g')"
 		#DEBIAN_DIST="${DEBIAN_DIST:-sid}"
-		DEBIAN_DIST="${DEBIAN_DIST:-stable}"
+		DEBIAN_DIST="${DEBIAN_DIST:-testing}"
 	fi
 	echo "Current version : ${DEBIAN_DIST}"
 
@@ -679,8 +679,8 @@ fn_make_ubuntu() {
 
 	local DEBIAN_MIRROR=
 	if [ ! -z "${TARGET_QEMU}" ]; then
-		#DEBIAN_MIRROR=http://ports.ubuntu.com/ubuntu-ports
-		DEBIAN_MIRROR=https://mirrors.xtom.com.hk/ubuntu-ports
+		#DEBIAN_MIRROR=https://mirrors.xtom.com.hk/ubuntu-ports
+		DEBIAN_MIRROR=http://ports.ubuntu.com/ubuntu-ports
 	else
 		#DEBIAN_MIRROR=http://kr.archive.ubuntu.com/ubuntu
 		#DEBIAN_MIRROR=http://ftp.daumkakao.com/ubuntu
@@ -721,7 +721,7 @@ fn_make_debian_common() {
 	fi
 	DEBIAN_OPTION=("${DEBIAN_OPTION[@]}" "--components=${DEBIAN_COMPONENTS// /,}")
 	DEBIAN_OPTION=("${DEBIAN_OPTION[@]}" "--merged-usr")
-	DEBIAN_OPTION=("--arch=${DEBIAN_ARCH}" "${DEBIAN_OPTION[@]}" "--exclude=bsdutils,e2fslibs,e2fsprogs,grep,gzip,libcomerr2,lsb-base,mount,sed,sysvinit-utils")
+	DEBIAN_OPTION=("--arch=${DEBIAN_ARCH}" "${DEBIAN_OPTION[@]}" "--exclude=bsdutils,e2fslibs,e2fsprogs,gzip,libcomerr2,lsb-base,mount,sed,sysvinit-utils")
 
 	#Copy qemu
 	if [ ! -z "${TARGET_QEMU}" ]; then

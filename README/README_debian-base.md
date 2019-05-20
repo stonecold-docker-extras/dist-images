@@ -7,6 +7,9 @@
 #### [debian-armhf-base](https://hub.docker.com/r/forumi0721/debian-armhf-base/)
 [![](https://images.microbadger.com/badges/version/forumi0721/debian-armhf-base.svg)](https://microbadger.com/images/forumi0721/debian-armhf-base "Get your own version badge on microbadger.com") [![](https://images.microbadger.com/badges/image/forumi0721/debian-armhf-base.svg)](https://microbadger.com/images/forumi0721/debian-armhf-base "Get your own image badge on microbadger.com") [![Docker Stars](https://img.shields.io/docker/stars/forumi0721/debian-armhf-base.svg?style=flat-square)](https://hub.docker.com/r/forumi0721/debian-armhf-base/)
 
+#### [debian-x64-base-stable](https://hub.docker.com/r/forumi0721/debian-x64-base-stable/)
+[![](https://images.microbadger.com/badges/version/forumi0721/debian-x64-base-stable.svg)](https://microbadger.com/images/forumi0721/debian-x64-base-stable "Get your own version badge on microbadger.com") [![](https://images.microbadger.com/badges/image/forumi0721/debian-x64-base-stable.svg)](https://microbadger.com/images/forumi0721/debian-x64-base-stable "Get your own image badge on microbadger.com") [![Docker Stars](https://img.shields.io/docker/stars/forumi0721/debian-x64-base-stable.svg?style=flat-square)](https://hub.docker.com/r/forumi0721/debian-x64-base-stable/)
+
 
 
 ----------------------------------------
@@ -105,4 +108,5 @@ RUN ["docker-build-end"]
 * [forumi0721/debian-x64-base](https://hub.docker.com/r/forumi0721/debian-x64-base/)
 * [forumi0721/debian-aarch64-base](https://hub.docker.com/r/forumi0721/debian-aarch64-base/)
 * [forumi0721/debian-armhf-base](https://hub.docker.com/r/forumi0721/debian-armhf-base/)
+* [forumi0721/debian-x64-base-stable](https://hub.docker.com/r/forumi0721/debian-x64-base-stable/)
 
