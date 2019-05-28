@@ -1,3 +1,6 @@
 [submodule "extras"]
 	path = extras
 	url = git@bitbucket.org:forumi0721/docker-dist-extras.git
+[submodule "blobs"]
+	path = blobs
+	url = git@bitbucket.org:forumi0721/docker-dist-blobs.git

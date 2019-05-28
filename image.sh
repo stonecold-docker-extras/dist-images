@@ -267,17 +267,18 @@ fn_make_alpine() {
 	elif [ -e /etc/zoneinfo/${TARGET_TIMEZONE} ]; then
 		rm -rf ${TARGET_OUTPUT}/etc/localtime
 		cat /etc/zoneinfo/${TARGET_TIMEZONE} > ${TARGET_OUTPUT}/etc/localtime
+	else
+		local tz1=$(echo "${TARGET_TIMEZONE}" | cut -d '/' -f 1)
+		local tz2=$(echo "${TARGET_TIMEZONE}" | cut -d '/' -f 2)
+		mkdir -p ${TARGET_OUTPUT}/tmp/tzdata
+		run_cmd ${TARGET_OUTPUT}/sbin/apk.static --repository ${ALPINE_MIRROR}/${ALPINE_DIST}/main --no-cache --allow-untrusted --root "${TARGET_OUTPUT}" --stdout --quiet fetch tzdata | tar -zx -C "${TARGET_OUTPUT}/tmp/tzdata" usr/share/zoneinfo
+		if [ -e ${TARGET_OUTPUT}/tmp/tzdata/usr/share/zoneinfo/${tz1}/${tz2} ]; then
+			mkdir -p ${TARGET_OUTPUT}/etc/zoneinfo/${tz1}
+			cp ${TARGET_OUTPUT}/tmp/tzdata/usr/share/zoneinfo/${tz1}/${tz2} ${TARGET_OUTPUT}/etc/zoneinfo/${tz1}/${tz2}
+			ln -sf /etc/zoneinfo/${tz1}/${tz2} ${TARGET_OUTPUT}/etc/localtime
+		fi
+		rm -rf ${TARGET_OUTPUT}/tmp/tzdata
 	fi
-	#local tz1=$(echo "${TARGET_TIMEZONE}" | cut -d '/' -f 1)
-	#local tz2=$(echo "${TARGET_TIMEZONE}" | cut -d '/' -f 2)
-	#mkdir -p ${TARGET_OUTPUT}/tmp/tzdata
-	#run_cmd ${TARGET_OUTPUT}/sbin/apk.static --repository ${ALPINE_MIRROR}/${ALPINE_DIST}/main --no-cache --allow-untrusted --root "${TARGET_OUTPUT}" --stdout --quiet fetch tzdata | tar -zx -C "${TARGET_OUTPUT}/tmp/tzdata" usr/share/zoneinfo
-	#if [ -e ${TARGET_OUTPUT}/tmp/tzdata/usr/share/zoneinfo/${tz1}/${tz2} ]; then
-	#	mkdir -p ${TARGET_OUTPUT}/etc/zoneinfo/${tz1}
-	#	cp ${TARGET_OUTPUT}/tmp/tzdata/usr/share/zoneinfo/${tz1}/${tz2} ${TARGET_OUTPUT}/etc/zoneinfo/${tz1}/${tz2}
-	#	ln -sf /etc/zoneinfo/${tz1}/${tz2} ${TARGET_OUTPUT}/etc/localtime
-	#fi
-	#rm -rf ${TARGET_OUTPUT}/tmp/tzdata
 
 	echo
 
