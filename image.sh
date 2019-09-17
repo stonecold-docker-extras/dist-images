@@ -789,8 +789,8 @@ fn_make_debian_common() {
 		#deb ${DEBIAN_MIRROR} ${DEBIAN_DIST}-backports ${DEBIAN_COMPONENTS}
 		## deb-src ${DEBIAN_MIRROR} ${DEBIAN_DIST}-backports ${DEBIAN_COMPONENTS}
 
-		$([ "${DEBIAN_DIST}" = "sid" ] && echo "#")deb http://security.debian.org ${DEBIAN_DIST}/updates ${DEBIAN_COMPONENTS}
-		$([ "${DEBIAN_DIST}" = "sid" ] && echo "#")# deb-src http://security.debian.org ${DEBIAN_DIST}/updates ${DEBIAN_COMPONENTS}
+		$([ "${DEBIAN_DIST}" = "sid" || "${DEBIAN_DIST}" = "testing" ] && echo "#")deb http://security.debian.org ${DEBIAN_DIST}/updates ${DEBIAN_COMPONENTS}
+		$([ "${DEBIAN_DIST}" = "sid" || "${DEBIAN_DIST}" = "testing" ] && echo "#")# deb-src http://security.debian.org ${DEBIAN_DIST}/updates ${DEBIAN_COMPONENTS}
 		EOF
 		#cat <<- EOF > ${TARGET_OUTPUT}/etc/apt/sources.list
 		#deb ${DEBIAN_MIRROR} ${DEBIAN_DIST} main
