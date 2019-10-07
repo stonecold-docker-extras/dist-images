@@ -573,7 +573,7 @@ fn_make_arch() {
 	echo "Configuration"
 
 	#users gid
-	sed -i "s/^users:x:.*$/users:x:100:/g" ${TARGET_OUTPUT}/etc/group
+	sed -i -e "s/^users:x:.*$/users:x:100:/g" ${TARGET_OUTPUT}/etc/group
 
 
 	#resolve
@@ -595,15 +595,15 @@ fn_make_arch() {
 
 	#basic config
 	echo "${PACMAN_MIRRORLIST}" > ${TARGET_OUTPUT}/etc/pacman.d/mirrorlist
-	sed -i "s/\(Architecture =\) auto/\1 ${ARCH_ARCH}/g" ${TARGET_OUTPUT}/etc/pacman.conf
-	sed -i "s/#\(NoUpgrade   =\)/\1 \/etc\/pacman.d\/mirrorlist/g" ${TARGET_OUTPUT}/etc/pacman.conf
+	sed -i -e "s/\(Architecture =\) auto/\1 ${ARCH_ARCH}/g" ${TARGET_OUTPUT}/etc/pacman.conf
+	sed -i -e "s/#\(NoUpgrade   =\)/\1 \/etc\/pacman.d\/mirrorlist/g" ${TARGET_OUTPUT}/etc/pacman.conf
 
 	#locale
 	#if [ -e ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8.gz ]; then
 	#	rm -rf ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8
 	#	gzip -dk ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8.gz
 	#fi
-	sed -i "s/#*[ ]*${TARGET_LOCALE}/${TARGET_LOCALE}/g" ${TARGET_OUTPUT}/etc/locale.gen
+	sed -i -e "s/#*[ ]*${TARGET_LOCALE}/${TARGET_LOCALE}/g" ${TARGET_OUTPUT}/etc/locale.gen
 	echo "LANG=${TARGET_LOCALE}" >> ${TARGET_OUTPUT}/etc/locale.conf
 	echo "LC_ALL=${TARGET_LOCALE}" >> ${TARGET_OUTPUT}/etc/locale.conf
 	chroot_cmd /bin/sh -c "locale-gen"
@@ -789,8 +789,8 @@ fn_make_debian_common() {
 		#deb ${DEBIAN_MIRROR} ${DEBIAN_DIST}-backports ${DEBIAN_COMPONENTS}
 		## deb-src ${DEBIAN_MIRROR} ${DEBIAN_DIST}-backports ${DEBIAN_COMPONENTS}
 
-		$([ "${DEBIAN_DIST}" = "sid" || "${DEBIAN_DIST}" = "testing" ] && echo "#")deb http://security.debian.org ${DEBIAN_DIST}/updates ${DEBIAN_COMPONENTS}
-		$([ "${DEBIAN_DIST}" = "sid" || "${DEBIAN_DIST}" = "testing" ] && echo "#")# deb-src http://security.debian.org ${DEBIAN_DIST}/updates ${DEBIAN_COMPONENTS}
+		$([ "${DEBIAN_DIST}" = "sid" -o "${DEBIAN_DIST}" = "testing" ] && echo "#")deb http://security.debian.org ${DEBIAN_DIST}/updates ${DEBIAN_COMPONENTS}
+		$([ "${DEBIAN_DIST}" = "sid" -o "${DEBIAN_DIST}" = "testing" ] && echo "#")# deb-src http://security.debian.org ${DEBIAN_DIST}/updates ${DEBIAN_COMPONENTS}
 		EOF
 		#cat <<- EOF > ${TARGET_OUTPUT}/etc/apt/sources.list
 		#deb ${DEBIAN_MIRROR} ${DEBIAN_DIST} main
@@ -842,7 +842,7 @@ fn_make_debian_common() {
 	chmod +x ${TARGET_OUTPUT}/usr/sbin/policy-rc.d
 
 	# https://github.com/docker/docker/blob/9a9fc01af8fb5d98b8eec0740716226fadb3735c/contrib/mkimage/debootstrap#L54-L56
-	chroot_cmd /bin/sh -c "dpkg-divert --local --rename --add /sbin/initctl ; cp -a /usr/sbin/policy-rc.d /sbin/initctl ; sed -i 's/^exit.*/exit 0/' /sbin/initctl"
+	chroot_cmd /bin/sh -c "dpkg-divert --local --rename --add /sbin/initctl ; cp -a /usr/sbin/policy-rc.d /sbin/initctl ; sed -i -e 's/^exit.*/exit 0/' /sbin/initctl"
 
 	#apt
 	echo "apt"
@@ -895,7 +895,7 @@ fn_make_debian_common() {
 
 	#locale
 	if [ -e "${TARGET_OUTPUT}/usr/sbin/locale-gen" ]; then
-		sed -i "s/#*[ ]*${TARGET_LOCALE}/${TARGET_LOCALE}/g" ${TARGET_OUTPUT}/etc/locale.gen
+		sed -i -e "s/#*[ ]*${TARGET_LOCALE}/${TARGET_LOCALE}/g" ${TARGET_OUTPUT}/etc/locale.gen
 		#if [ -e ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8.gz ]; then
 		#	rm -rf ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8
 		#	gzip -dk ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8.gz
