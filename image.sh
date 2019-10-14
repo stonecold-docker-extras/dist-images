@@ -791,7 +791,15 @@ fn_make_debian_common() {
 
 		$([ "${DEBIAN_DIST}" = "sid" -o "${DEBIAN_DIST}" = "testing" ] && echo "#")deb http://security.debian.org ${DEBIAN_DIST}/updates ${DEBIAN_COMPONENTS}
 		$([ "${DEBIAN_DIST}" = "sid" -o "${DEBIAN_DIST}" = "testing" ] && echo "#")# deb-src http://security.debian.org ${DEBIAN_DIST}/updates ${DEBIAN_COMPONENTS}
+
 		EOF
+		if [ "${DEBIAN_DIST}" = "sid" -o "${DEBIAN_DIST}" = "testing" ] ; then
+			cat <<- EOF >> ${TARGET_OUTPUT}/etc/apt/sources.list
+			deb ${DEBIAN_MIRROR} stable ${DEBIAN_COMPONENTS}
+			# deb-src ${DEBIAN_MIRROR} stable ${DEBIAN_COMPONENTS}
+
+			EOF
+		fi
 		#cat <<- EOF > ${TARGET_OUTPUT}/etc/apt/sources.list
 		#deb ${DEBIAN_MIRROR} ${DEBIAN_DIST} main
 		## deb-src ${DEBIAN_MIRROR} ${DEBIAN_DIST} main
