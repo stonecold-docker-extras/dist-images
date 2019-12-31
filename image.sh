@@ -310,16 +310,6 @@ fn_make_entware() {
 	ALPINE_ARCH=${ALPINE_ARCH/armhf/armv7}
 	ALPINE_ARCH=${ALPINE_ARCH/aarch64/aarch64}
 
-	#busybox
-	local busybox="https://mirror.xtom.com.hk/alpine/edge/main/${ALPINE_ARCH}/$(wget https://mirror.xtom.com.hk/alpine/edge/main/${ALPINE_ARCH}/ -q -O - | grep busybox-static | sed -e 's/^.*href="\([^"]*\)".*$/\1/g')"
-	wget "${busybox}" -q -O - | tar zxf - -C ${TARGET_OUTPUT}/
-	rm -rf ${TARGET_OUTPUT}/.PKGINFO ${TARGET_OUTPUT}/.SIGN.RSA*
-	ln -s /bin/busybox.static ${TARGET_OUTPUT}/bin/sh
-	ln -s /bin/busybox.static ${TARGET_OUTPUT}/bin/wget
-	ln -s /bin/busybox.static ${TARGET_OUTPUT}/bin/mkdir
-	ln -s /bin/busybox.static ${TARGET_OUTPUT}/bin/chmod
-	ln -s /bin/busybox.static ${TARGET_OUTPUT}/bin/ln
-
 	#qemu
 	mkdir -p ${TARGET_OUTPUT}/usr/bin
 	if [ ! -z "${TARGET_QEMU}" ]; then
@@ -327,13 +317,22 @@ fn_make_entware() {
 		cp extras/${TARGET_QEMU} ${TARGET_OUTPUT}/usr/bin/
 
 		chroot_cmd() {
-			QEMU_EXECVE=1 PATH="/opt/sbin:/opt/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve "${@}"
+			QEMU_EXECVE=1 PATH="/opt/sbin:/opt/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/bbin" chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve "${@}"
 		}
 	else
 		chroot_cmd() {
-			PATH="/opt/sbin:/opt/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" chroot "${TARGET_OUTPUT}" "${@}"
+			PATH="/opt/sbin:/opt/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/bbin" chroot "${TARGET_OUTPUT}" "${@}"
 		}
 	fi
+
+	#busybox
+	local busybox="https://mirror.xtom.com.hk/alpine/edge/main/${ALPINE_ARCH}/$(wget https://mirror.xtom.com.hk/alpine/edge/main/${ALPINE_ARCH}/ -q -O - | grep busybox-static | sed -e 's/^.*href="\([^"]*\)".*$/\1/g')"
+	wget "${busybox}" -q -O - | tar zxf - -C ${TARGET_OUTPUT}/
+	rm -rf ${TARGET_OUTPUT}/.PKGINFO ${TARGET_OUTPUT}/.SIGN.RSA*
+	mv ${TARGET_OUTPUT}/bin ${TARGET_OUTPUT}/bbin
+	chroot_cmd /bbin/busybox.static --install -s /bbin
+	mkdir -p ${TARGET_OUTPUT}/bin
+	ln -s /bbin/busybox.static ${TARGET_OUTPUT}/bin/sh
 
 	#Create basic directory
 	for folder in dev etc proc run sys
@@ -351,7 +350,7 @@ fn_make_entware() {
 	wget http://bin.entware.net/${ENTWARE_VER}/installer/generic.sh -q -O ${TARGET_OUTPUT}/entware_install.sh
 	sed -i -e 's|/opt/bin/opkg install entware-opt|#/opt/bin/opkg install entware-opt|g' ${TARGET_OUTPUT}/entware_install.sh
 	sed -i -e 's|chmod 777 /opt/tmp|chmod 777 /opt/tmp\nexit 0|g' ${TARGET_OUTPUT}/entware_install.sh
-	chroot_cmd /bin/sh -c "/bin/sh /entware_install.sh ; /opt/bin/opkg install opkg busybox entware-release"
+	chroot_cmd /bin/sh -c "/bin/sh /entware_install.sh ; /opt/bin/opkg update ; /opt/bin/opkg install opkg busybox entware-release"
 	rm -rf ${TARGET_OUTPUT}/entware_install.sh
 
 	#ln
@@ -466,6 +465,8 @@ fn_make_entware() {
 
 
 	echo "Clearing"
+
+	rm -rf ${TARGET_OUTPUT}/bbin
 
 	echo
 
