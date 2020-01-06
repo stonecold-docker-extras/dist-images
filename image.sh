@@ -997,6 +997,29 @@ fn_update() {
 	#docker-chown
 	cp -f extras/docker-chown ${TARGET_OUTPUT}/usr/local/bin/docker-chown
 
+	#debian locale
+	if [ -e ${TARGET_OUTPUT}/etc/debian_version -a -e "${TARGET_OUTPUT}/usr/sbin/locale-gen" ]; then
+		if [ -z "$(grep "^${TARGET_LOCALE}" ${TARGET_OUTPUT}/etc/locale.gen)" ]; then
+			if [ ! -z "${TARGET_QEMU}" ]; then
+				chroot_cmd() {
+					QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve "${@}"
+				}
+			else
+				chroot_cmd() {
+					PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true chroot "${TARGET_OUTPUT}" "${@}"
+				}
+			fi
+			sed -i -e "s/#*[ ]*${TARGET_LOCALE}/${TARGET_LOCALE}/g" ${TARGET_OUTPUT}/etc/locale.gen
+			#if [ -e ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8.gz ]; then
+			#	rm -rf ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8
+			#	gzip -dk ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8.gz
+			#fi
+			chroot_cmd /bin/sh -c "/usr/sbin/locale-gen"
+			echo "LANG=${TARGET_LOCALE}" >> ${TARGET_OUTPUT}/etc/default/locale
+			echo "LANGUAGE=${TARGET_LOCALE}" >> ${TARGET_OUTPUT}/etc/default/locale
+			echo "LC_ALL=${TARGET_LOCALE}" >> ${TARGET_OUTPUT}/etc/default/locale
+		fi
+	fi
 
 	#archlinux fix
 	if [ -e "${TARGET_OUTPUT}/etc/arch-release" ]; then
@@ -1040,10 +1063,18 @@ fn_update() {
 			PATH_CHROOT=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 		fi
 
-		if [ ! -z "${TARGET_QEMU}" ]; then
-			QEMU_EXECVE=1 PATH="${PATH_CHROOT}" LANG=C LC_ALL=C ${CHROOT_CMD} "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "docker-install -r -u -c"
+		if [ "${TARGET_DISTRO}" = "debian" -o "${TARGET_DISTRO}" = "ubuntu" ]; then
+			if [ ! -z "${TARGET_QEMU}" ]; then
+				QEMU_EXECVE=1 PATH="${PATH_CHROOT}" LANG=C LC_ALL=C ${CHROOT_CMD} "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "docker-install -r -u -c"
+			else
+				PATH="${PATH_CHROOT}" LANG=C LC_ALL=C ${CHROOT_CMD} "${TARGET_OUTPUT}" /bin/sh -c "docker-install -r -u -f -c"
+			fi
 		else
-			PATH="${PATH_CHROOT}" LANG=C LC_ALL=C ${CHROOT_CMD} "${TARGET_OUTPUT}" /bin/sh -c "docker-install -r -u -c"
+			if [ ! -z "${TARGET_QEMU}" ]; then
+				QEMU_EXECVE=1 PATH="${PATH_CHROOT}" LANG=C LC_ALL=C ${CHROOT_CMD} "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "docker-install -r -u -c"
+			else
+				PATH="${PATH_CHROOT}" LANG=C LC_ALL=C ${CHROOT_CMD} "${TARGET_OUTPUT}" /bin/sh -c "docker-install -r -u -f -c"
+			fi
 		fi
 
 		#archlinux update-ca-trust
