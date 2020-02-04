@@ -378,6 +378,9 @@ fn_make_entware() {
 		cp extras/${TARGET_QEMU} ${TARGET_OUTPUT}/usr/bin/
 	fi
 
+	#workaround link
+	ln -s /opt/bin/env ${TARGET_OUTPUT}/usr/bin/env
+
 	chroot_cmd /bin/sh -c "/opt/bin/opkg update ; /opt/bin/opkg download entware-opt"
 	tar zxf ${TARGET_OUTPUT}/entware-opt* -C ${TARGET_OUTPUT}/
 	tar zxf ${TARGET_OUTPUT}/data.tar.gz -C ${TARGET_OUTPUT}/
