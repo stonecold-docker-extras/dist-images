@@ -1331,6 +1331,13 @@ else
 	VERBOSE=${VERBOSE:-Y}
 fi
 
+#always make image
+if [ "${TARGET_UPDATE}" = "Y" ]; then
+	if [ "${TARGET_DISTRO}" = "alpine" -o "${TARGET_DISTRO}" = "entware" ]; then
+		TARGET_MAKE=Y
+	fi
+fi
+
 #confirm
 if [ "${DEBUG}" = "Y" -o "${VERBOSE}" = "Y" ]; then
 	echo "TARGET_DISTRO=${TARGET_DISTRO}"
