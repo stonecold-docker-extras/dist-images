@@ -1245,21 +1245,23 @@ done
 if [ ! -e dist ]; then
 	mkdir -p dist
 fi
-if [ ! -e dist.img ]; then
-	truncate -s 5G dist.img
-	losetup -f ./dist.img
-	lo_dev="$(losetup -j ./dist.img | cut -d ':' -f 1)"
-	mkfs.ext4 -F ${lo_dev}
-	losetup -d ${lo_dev}
-	mount -o loop dist.img dist
-	touch dist/img
-elif [ ! -e dist/img ]; then
-	mount -o loop dist.img dist
-fi
+if [ -e dist.img ]; then
+	if [ ! -e dist.img ]; then
+		truncate -s 5G dist.img
+		losetup -f ./dist.img
+		lo_dev="$(losetup -j ./dist.img | cut -d ':' -f 1)"
+		mkfs.ext4 -F ${lo_dev}
+		losetup -d ${lo_dev}
+		mount -o loop dist.img dist
+		touch dist/img
+	elif [ ! -e dist/img ]; then
+		mount -o loop dist.img dist
+	fi
 
-if [ ! -e dist/img ]; then
-	echo "Errof dist.img"
-	exit 1
+	if [ ! -e dist/img ]; then
+		echo "Errof dist.img"
+		exit 1
+	fi
 fi
 
 #set default
@@ -1468,7 +1470,9 @@ if [ ! -e /.dockerenv -a "${TARGET_PUSH}" = "Y" ]; then
 	fn_push
 fi
 
-if [ -e dist/img ]; then
-	umount dist
+if [ -e dist.img ]; then
+	if [ -e dist/img ]; then
+		umount dist
+	fi
 fi
 
