@@ -478,18 +478,24 @@ fn_make_entware() {
 }
 
 fn_make_arch() {
-	if ! pacstrap -h &>/dev/null ; then
-		echo "Could not find pacstrap. Run pacman -S arch-install-scripts"
-		exit 1
-	fi
+	#if ! pacstrap -h &>/dev/null ; then
+	#	echo "Could not find pacstrap. Run pacman -S arch-install-scripts"
+	#	exit 1
+	#fi
 
-	if ! arch-chroot -h &>/dev/null ; then
-		echo "Could not find arch-chroot. Run pacman -S arch-install-scripts"
-		exit 1
-	fi
+	#if ! arch-chroot -h &>/dev/null ; then
+	#	echo "Could not find arch-chroot. Run pacman -S arch-install-scripts"
+	#	exit 1
+	#fi
+
+	#if ! pacman -h &>/dev/null ; then
+	#	echo "Could not find pacman. Run pacman -S arch-install-scripts"
+	#	exit 1
+	#fi
 
 	echo "Bootstrap"
 
+	local PACMAN_MIRROR=
 	local PACMAN_MIRRORLIST=
 	#local PACMAN_BASE_PKGS=(bash bzip2 coreutils diffutils filesystem findutils gettext glibc grep gzip less pacman perl procps-ng sed shadow systemd)
 	local PACMAN_BASE_PKGS="bash coreutils diffutils filesystem findutils gettext glibc grep gzip less pacman procps-ng sed systemd haveged"
@@ -506,11 +512,13 @@ fn_make_arch() {
 	if [ "${ARCH_ARCH}" = "armv7h" -o "${ARCH_ARCH}" = "aarch64" ]; then
 		#PACMAN_MIRRORLIST='Server = http://mirror.archlinuxarm.org/$arch/$repo'
 		#PACMAN_MIRRORLIST='Server = http://sg.mirror.archlinuxarm.org/$arch/$repo'
-		PACMAN_MIRRORLIST='Server = http://ca.us.mirror.archlinuxarm.org/$arch/$repo'
+		PACMAN_MIRROR='http://ca.us.mirror.archlinuxarm.org'
+		PACMAN_MIRRORLIST="Server = ${PACMAN_MIRROR}/\$arch/\$repo"
 		PACMAN_EXTRA_PKGS="archlinuxarm-keyring"
 		ARCH_KEYRING="archlinuxarm"
 	else
-		PACMAN_MIRRORLIST='Server = http://ftp.lanet.kr/pub/archlinux/$repo/os/$arch'
+		PACMAN_MIRROR='http://ftp.lanet.kr/pub/archlinux'
+		PACMAN_MIRRORLIST="Server = ${PACMAN_MIRROR}/\$repo/os/\$arch"
 		PACMAN_EXTRA_PKGS=""
 		ARCH_KEYRING="archlinux"
 	fi
@@ -554,24 +562,45 @@ fn_make_arch() {
 		mkdir -p ${TARGET_OUTPUT}/usr/bin
 		cp extras/${TARGET_QEMU} ${TARGET_OUTPUT}/usr/bin/
 		chroot_cmd() {
-			QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve "${@}"
+			#QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve "${@}"
+			QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve "${@}"
 		}
 	else
 		chroot_cmd() {
-			PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" "${@}"
+			#PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" "${@}"
+			PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" chroot "${TARGET_OUTPUT}" "${@}"
 		}
 	fi
 
-	if [ ! -z "${TARGET_QEMU}" ]; then
-		pacstrap -C ${PACMAN_CONF} -c -d -G -M "${TARGET_OUTPUT}" filesystem pacman shadow grep haveged procps-ng
+	mkdir -m 0755 -p ${TARGET_OUTPUT}/var/{cache/pacman/pkg,lib/pacman,log}
+	mkdir -m 0755 -p ${TARGET_OUTPUT}/{dev,run,etc/pacman.d}
+	mkdir -m 1777 -p ${TARGET_OUTPUT}/tmp
+	mkdir -m 0555 -p ${TARGET_OUTPUT}/{sys,proc}
 
-		chroot_cmd /bin/sh -c "/usr/bin/haveged ; /usr/bin/rm -fr /etc/pacman.d/gnupg ; /usr/bin/pacman-key --init ; /usr/bin/pacman-key --populate ${ARCH_KEYRING} ; /usr/bin/pkill haveged ; /usr/bin/pkill gpg-agent"
-		chroot_cmd /bin/sh -c "/usr/bin/pacman -Suy --noconfirm ${PACMAN_BASE_PKGS} ${PACMAN_EXTRA_PKGS}"
-	else
-		pacstrap -C ${PACMAN_CONF} -c -d -G -M "${TARGET_OUTPUT}" filesystem pacman shadow grep
+	echo "rootfs / rootfs rw 0 0" > "${TARGET_OUTPUT}/etc/mtab"
+	mknod -m 0666 "${TARGET_OUTPUT}/dev/null" c 1 3
+	mknod -m 0666 "${TARGET_OUTPUT}/dev/random" c 1 8
+	mknod -m 0666 "${TARGET_OUTPUT}/dev/urandom" c 1 9
 
-		pacstrap -C ${PACMAN_CONF} -c -d -G -M "${TARGET_OUTPUT}" ${PACMAN_BASE_PKGS} ${PACMAN_EXTRA_PKGS}
-	fi
+	#if [ ! -z "${TARGET_QEMU}" ]; then
+	#	pacstrap -C ${PACMAN_CONF} -c -d -G -M "${TARGET_OUTPUT}" filesystem pacman shadow grep haveged procps-ng
+
+	#	chroot_cmd /bin/sh -c "/usr/bin/haveged ; /usr/bin/rm -fr /etc/pacman.d/gnupg ; /usr/bin/pacman-key --init ; /usr/bin/pacman-key --populate ${ARCH_KEYRING} ; /usr/bin/pkill haveged ; /usr/bin/pkill gpg-agent"
+	#	chroot_cmd /bin/sh -c "/usr/bin/pacman -Suy --noconfirm ${PACMAN_BASE_PKGS} ${PACMAN_EXTRA_PKGS}"
+	#else
+	#	pacstrap -C ${PACMAN_CONF} -c -d -G -M "${TARGET_OUTPUT}" filesystem pacman shadow grep
+
+	#	pacstrap -C ${PACMAN_CONF} -c -d -G -M "${TARGET_OUTPUT}" ${PACMAN_BASE_PKGS} ${PACMAN_EXTRA_PKGS}
+	#fi
+
+	extras/arch-bootstrap.sh -a ${ARCH_ARCH} -r "${PACMAN_MIRROR}" ${TARGET_OUTPUT}
+
+	find ${TARGET_OUTPUT} -name \*.pacnew -exec rm -rf {} \;
+
+	rm -rf ${TARGET_OUTPUT}/.BUILDINFO ${TARGET_OUTPUT}/.INSTALL ${TARGET_OUTPUT}/.MTREE ${TARGET_OUTPUT}/.PKGINFO
+	cp ${PACMAN_CONF} ${TARGET_OUTPUT}/
+	chroot_cmd /bin/sh -c "/usr/bin/pacman -Suy --noconfirm --overwrite \"*\" ${PACMAN_BASE_PKGS} ${PACMAN_EXTRA_PKGS}"
+	chroot_cmd /bin/sh -c "/usr/bin/haveged ; /usr/bin/rm -fr /etc/pacman.d/gnupg ; /usr/bin/pacman-key --init ; /usr/bin/pacman-key --populate ${ARCH_KEYRING} ; /usr/bin/pkill haveged ; /usr/bin/pkill gpg-agent"
 
 	echo
 
