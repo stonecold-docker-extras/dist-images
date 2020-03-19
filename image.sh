@@ -956,6 +956,32 @@ fn_update() {
 	#qemu
 	if [ ! -z "${TARGET_QEMU}" ]; then
 		cp -f extras/${TARGET_QEMU} "${TARGET_OUTPUT}/usr/bin/"
+		cp -f extras/${TARGET_QEMU} "${TARGET_OUTPUT}/usr/local/bin/"
+		chmod 4755 "${TARGET_OUTPUT}/usr/local/bin/${TARGET_QEMU}"
+		cat << EOF > ${TARGET_OUTPUT}/usr/local/bin/sudo
+#!/bin/sh
+
+qemu=/usr/local/bin/${TARGET_QEMU}
+sudo=/usr/bin/sudo
+
+if grep -q -w lm /proc/cpuinfo ; then
+        if [ "\$(basename "\${0}")" = "sudoedit" ]; then
+                \${qemu} -execve -0 /bin/sh \${sudo} -e "\${@}"
+        else
+                \${qemu} -execve -0 /bin/sh \${sudo} "\${@}"
+        fi
+else
+        if [ "\$(basename "\${0}")" = "sudoedit" ]; then
+                \${sudo} -e "\${@}"
+        else
+                \${sudo} "\${@}"
+        fi
+fi
+
+exit \$?
+EOF
+		chmod 4755 ${TARGET_OUTPUT}/usr/local/bin/sudo
+		ln -s sudo ${TARGET_OUTPUT}/usr/local/bin/sudoedit
 	fi
 
 	#docker-run
