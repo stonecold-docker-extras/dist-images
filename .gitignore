@@ -5,3 +5,4 @@ dist.img
 dist
 docker/home
 docker/root
+.fuse_hidden*

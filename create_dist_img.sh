@@ -1,5 +1,10 @@
 #!/bin/sh
 
+if [ "${EUID}" != "0" ]; then
+	sudo "${0}" "${@}"
+	exit $?
+fi
+
 if [ ! -e dist.img ]; then
 	truncate -s 5G dist.img
 	losetup -f ./dist.img
