@@ -599,8 +599,10 @@ fn_make_arch() {
 
 	rm -rf ${TARGET_OUTPUT}/.BUILDINFO ${TARGET_OUTPUT}/.INSTALL ${TARGET_OUTPUT}/.MTREE ${TARGET_OUTPUT}/.PKGINFO
 	cp ${PACMAN_CONF} ${TARGET_OUTPUT}/
-	chroot_cmd /bin/sh -c "/usr/bin/pacman -Suy --noconfirm --overwrite \"*\" ${PACMAN_BASE_PKGS} ${PACMAN_EXTRA_PKGS}"
-	chroot_cmd /bin/sh -c "/usr/bin/haveged ; /usr/bin/rm -fr /etc/pacman.d/gnupg ; /usr/bin/pacman-key --init ; /usr/bin/pacman-key --populate ${ARCH_KEYRING} ; /usr/bin/pkill haveged ; /usr/bin/pkill gpg-agent"
+	#chroot_cmd /bin/sh -c "/usr/bin/pacman -Suy --noconfirm --overwrite \"*\" ${PACMAN_BASE_PKGS} ${PACMAN_EXTRA_PKGS}"
+	chroot_cmd /usr/bin/pacman -Suy --noconfirm --overwrite "*" ${PACMAN_BASE_PKGS} ${PACMAN_EXTRA_PKGS}
+	#chroot_cmd /bin/sh -c "/usr/bin/haveged ; /usr/bin/rm -fr /etc/pacman.d/gnupg ; /usr/bin/pacman-key --init ; /usr/bin/pacman-key --populate ${ARCH_KEYRING} ; /usr/bin/pkill haveged ; /usr/bin/pkill gpg-agent"
+	chroot_cmd /usr/bin/haveged ; /usr/bin/rm -fr /etc/pacman.d/gnupg ; /usr/bin/pacman-key --init ; /usr/bin/pacman-key --populate ${ARCH_KEYRING} ; /usr/bin/pkill haveged ; /usr/bin/pkill gpg-agent
 
 	echo
 
@@ -618,14 +620,17 @@ fn_make_arch() {
 
 	#systemd-sysusers
 	if [ -e "${TARGET_OUTPUT}/usr/bin/systemd-sysusers" ]; then
-		chroot_cmd /bin/sh -c "/usr/bin/systemd-sysusers"
+		#chroot_cmd /bin/sh -c "/usr/bin/systemd-sysusers"
+		chroot_cmd /usr/bin/systemd-sysusers
 	fi
 
 	#update-ca-trust
-	chroot_cmd /bin/sh -c "update-ca-trust"
+	#chroot_cmd /bin/sh -c "update-ca-trust"
+	chroot_cmd update-ca-trust
 
 	#keyring
-	chroot_cmd /bin/sh -c "/usr/bin/haveged ; /usr/bin/rm -fr /etc/pacman.d/gnupg ; /usr/bin/pacman-key --init ; /usr/bin/pacman-key --populate ${ARCH_KEYRING} ; /usr/bin/pkill haveged ; /usr/bin/pkill gpg-agent"
+	#chroot_cmd /bin/sh -c "/usr/bin/haveged ; /usr/bin/rm -fr /etc/pacman.d/gnupg ; /usr/bin/pacman-key --init ; /usr/bin/pacman-key --populate ${ARCH_KEYRING} ; /usr/bin/pkill haveged ; /usr/bin/pkill gpg-agent"
+	chroot_cmd /usr/bin/haveged ; /usr/bin/rm -fr /etc/pacman.d/gnupg ; /usr/bin/pacman-key --init ; /usr/bin/pacman-key --populate ${ARCH_KEYRING} ; /usr/bin/pkill haveged ; /usr/bin/pkill gpg-agent
 
 	#basic config
 	echo "${PACMAN_MIRRORLIST}" > ${TARGET_OUTPUT}/etc/pacman.d/mirrorlist
@@ -640,7 +645,8 @@ fn_make_arch() {
 	sed -i -e "s/#*[ ]*${TARGET_LOCALE}/${TARGET_LOCALE}/g" ${TARGET_OUTPUT}/etc/locale.gen
 	echo "LANG=${TARGET_LOCALE}" >> ${TARGET_OUTPUT}/etc/locale.conf
 	echo "LC_ALL=${TARGET_LOCALE}" >> ${TARGET_OUTPUT}/etc/locale.conf
-	chroot_cmd /bin/sh -c "locale-gen"
+	#chroot_cmd /bin/sh -c "locale-gen"
+	chroot_cmd locale-gen
 
 	#timezone
 	if [ -e "${TARGET_OUTPUT}/usr/share/zoneinfo/${TARGET_TIMEZONE}" ]; then
@@ -655,7 +661,8 @@ fn_make_arch() {
 	if [ -e extras/package-query-*-${ARCH_ARCH}.pkg.tar.xz -a -e extras/yaourt-*-any.pkg.tar.xz ]; then
 		cp extras/package-query-*-${ARCH_ARCH}.pkg.tar.xz ${TARGET_OUTPUT}/
 		cp extras/yaourt-*-any.pkg.tar.xz ${TARGET_OUTPUT}/
-		chroot_cmd /bin/sh -c "/usr/bin/pacman -Sy --noconfirm ; /usr/bin/pacman -U --noconfirm --asdeps /package-query-*; /usr/bin/pacman -U --noconfirm /yaourt-*-any.pkg.tar.xz"
+		#chroot_cmd /bin/sh -c "/usr/bin/pacman -Sy --noconfirm ; /usr/bin/pacman -U --noconfirm --asdeps /package-query-*; /usr/bin/pacman -U --noconfirm /yaourt-*-any.pkg.tar.xz"
+		chroot_cmd /usr/bin/pacman -Sy --noconfirm ; /usr/bin/pacman -U --noconfirm --asdeps /package-query-*; /usr/bin/pacman -U --noconfirm /yaourt-*-any.pkg.tar.xz
 		rm -rf ${TARGET_OUTPUT}/*.pkg.tar.xz
 	fi
 
@@ -668,7 +675,8 @@ fn_make_arch() {
 	echo "Clearing"
 	rm -rf "${PACMAN_CONF}"
 	if [ ! -z "${PACMAN_REMOVE_PKGS}" ]; then
-		chroot_cmd /bin/sh -c /usr/bin/"pacman -Rsn --noconfirm ${PACMAN_REMOVE_PKGS}"
+		#chroot_cmd /bin/sh -c "/usr/bin/pacman -Rsn --noconfirm ${PACMAN_REMOVE_PKGS}"
+		chroot_cmd /usr/bin/pacman -Rsn --noconfirm ${PACMAN_REMOVE_PKGS}
 	fi
 	echo
 
