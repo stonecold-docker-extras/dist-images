@@ -285,7 +285,7 @@ fn_make_alpine() {
 
 	echo "Clearing"
 
-	rm -rf /sbin/apk.static
+	rm -rf ${TARGET_OUTPUT}/sbin/apk.static
 
 	echo
 
