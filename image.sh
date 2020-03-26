@@ -285,6 +285,8 @@ fn_make_alpine() {
 
 	echo "Clearing"
 
+	rm -rf /sbin/apk.static
+
 	echo
 
 	fn_make_common
