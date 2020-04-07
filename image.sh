@@ -725,7 +725,8 @@ fn_make_ubuntu() {
 	local DEBIAN_MIRROR=
 	if [ ! -z "${TARGET_QEMU}" ]; then
 		#DEBIAN_MIRROR=https://mirrors.xtom.com.hk/ubuntu-ports
-		DEBIAN_MIRROR=http://ports.ubuntu.com/ubuntu-ports
+		#DEBIAN_MIRROR=http://ports.ubuntu.com/ubuntu-ports
+		DEBIAN_MIRROR=http://ftp.harukasan.org/ubuntu-ports
 	else
 		#DEBIAN_MIRROR=http://kr.archive.ubuntu.com/ubuntu
 		#DEBIAN_MIRROR=http://ftp.daumkakao.com/ubuntu
