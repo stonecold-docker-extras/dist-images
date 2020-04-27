@@ -719,7 +719,8 @@ fn_make_ubuntu() {
 	local DEBIAN_DIST=${TARGET_EDITION}
 	if [ -z "${DEBIAN_DIST}" ]; then
 		#DEBIAN_DIST="$(curl -sSL http://ftp.kaist.ac.kr/ubuntu/dists/ | grep -v 'backports' | grep -v 'proposed' | grep -v 'security' | grep -v 'updates' | grep '<tr><td class="n">' | tail -1  | sed -e 's/^<tr><td class="n"><a href="\(.*\)\/">.*$/\1/g')"
-		DEBIAN_DIST="${DEBIAN_DIST:-eoan}"
+		#DEBIAN_DIST="${DEBIAN_DIST:-eoan}"
+		DEBIAN_DIST="${DEBIAN_DIST:-focal}"
 	fi
 	echo "Current version : ${DEBIAN_DIST}"
 
