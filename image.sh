@@ -158,9 +158,9 @@ fn_make_busybox() {
 	umask 022
 
 	for script in /etc/profile.d/*.sh ; do
-	    if [ -r $script ] ; then
-	        . $script
-	    fi
+		if [ -r $script ] ; then
+			. $script
+		fi
 	done
 	EOF
 	chmod 755 ${TARGET_OUTPUT}/etc/profile
@@ -1011,17 +1011,17 @@ sudo=/usr/bin/sudo
 if [ ! -x \${sudo} -o ! -x \${qemu} ]; then
 		"\${@}"
 elif grep -q -w lm /proc/cpuinfo ; then
-        if [ "\$(basename "\${0}")" = "sudoedit" ]; then
-                \${qemu} -execve -0 /bin/sh \${sudo} -e "\${@}"
-        else
-                \${qemu} -execve -0 /bin/sh \${sudo} "\${@}"
-        fi
+		if [ "\$(basename "\${0}")" = "sudoedit" ]; then
+				\${qemu} -execve -0 /bin/sh \${sudo} -e "\${@}"
+		else
+				\${qemu} -execve -0 /bin/sh \${sudo} "\${@}"
+		fi
 else
-        if [ "\$(basename "\${0}")" = "sudoedit" ]; then
-                \${sudo} -e "\${@}"
-        else
-                \${sudo} "\${@}"
-        fi
+		if [ "\$(basename "\${0}")" = "sudoedit" ]; then
+				\${sudo} -e "\${@}"
+		else
+				\${sudo} "\${@}"
+		fi
 fi
 
 exit \$?
