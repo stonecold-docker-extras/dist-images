@@ -1008,7 +1008,9 @@ fn_update() {
 qemu=/usr/local/bin/${TARGET_QEMU}
 sudo=/usr/bin/sudo
 
-if grep -q -w lm /proc/cpuinfo ; then
+if [ ! -x \${sudo} -o ! -x \${qemu} ]; then
+		"\${@}"
+elif grep -q -w lm /proc/cpuinfo ; then
         if [ "\$(basename "\${0}")" = "sudoedit" ]; then
                 \${qemu} -execve -0 /bin/sh \${sudo} -e "\${@}"
         else
