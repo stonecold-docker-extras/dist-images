@@ -1000,7 +1000,8 @@ fn_update() {
 	#qemu
 	if [ ! -z "${TARGET_QEMU}" ]; then
 		cp -f extras/${TARGET_QEMU} "${TARGET_OUTPUT}/usr/bin/"
-		cp -f extras/${TARGET_QEMU} "${TARGET_OUTPUT}/usr/local/bin/"
+		#cp -f extras/${TARGET_QEMU} "${TARGET_OUTPUT}/usr/local/bin/"
+		ln "${TARGET_OUTPUT}/usr/bin/${TARGET_QEMU}" "${TARGET_OUTPUT}/usr/local/bin/${TARGET_QEMU}"
 		chmod 4755 "${TARGET_OUTPUT}/usr/local/bin/${TARGET_QEMU}"
 		cat << EOF > ${TARGET_OUTPUT}/usr/local/bin/sudo
 #!/bin/sh
