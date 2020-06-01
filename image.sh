@@ -519,8 +519,8 @@ fn_make_arch() {
 		PACMAN_EXTRA_PKGS="archlinuxarm-keyring"
 		ARCH_KEYRING="archlinuxarm"
 	else
-		PACMAN_MIRROR='http://ftp.lanet.kr/pub/archlinux'
-		#PACMAN_MIRROR='http://ftp4.harukasan.org/archlinux'
+		#PACMAN_MIRROR='http://ftp.lanet.kr/pub/archlinux'
+		PACMAN_MIRROR='http://ftp.harukasan.org/archlinux'
 		PACMAN_MIRRORLIST="Server = ${PACMAN_MIRROR}/\$repo/os/\$arch"
 		PACMAN_EXTRA_PKGS=""
 		ARCH_KEYRING="archlinux"
@@ -700,8 +700,8 @@ fn_make_debian() {
 
 	#local DEBIAN_MIRROR=http://ftp.kr.debian.org/debian
 	#local DEBIAN_MIRROR=http://ftp.daumkakao.com/debian
-	#local DEBIAN_MIRROR=http://ftp4.harukasan.org/debian
-	local DEBIAN_MIRROR="http://ftp.lanet.kr/pub/debian"
+	#local DEBIAN_MIRROR="http://ftp.lanet.kr/pub/debian"
+	local DEBIAN_MIRROR=http://ftp.harukasan.org/debian
 
 	local DEBIAN_EXTRA=""
 	#local DEBIAN_EXTRA=locales
@@ -733,8 +733,8 @@ fn_make_ubuntu() {
 	else
 		#DEBIAN_MIRROR=http://kr.archive.ubuntu.com/ubuntu
 		#DEBIAN_MIRROR=http://ftp.daumkakao.com/ubuntu
-		#DEBIAN_MIRROR=http://ftp4.harukasan.org/ubuntu
-		DEBIAN_MIRROR="http://ftp.lanet.kr/pub/ubuntu"
+		#DEBIAN_MIRROR="http://ftp.lanet.kr/pub/ubuntu"
+		DEBIAN_MIRROR=http://ftp.harukasan.org/ubuntu
 	fi
 
 	local DEBIAN_EXTRA=""
