@@ -721,7 +721,8 @@ fn_make_ubuntu() {
 	if [ -z "${DEBIAN_DIST}" ]; then
 		#DEBIAN_DIST="$(curl -sSL http://ftp.kaist.ac.kr/ubuntu/dists/ | grep -v 'backports' | grep -v 'proposed' | grep -v 'security' | grep -v 'updates' | grep '<tr><td class="n">' | tail -1  | sed -e 's/^<tr><td class="n"><a href="\(.*\)\/">.*$/\1/g')"
 		#DEBIAN_DIST="${DEBIAN_DIST:-eoan}"
-		DEBIAN_DIST="${DEBIAN_DIST:-focal}"
+		#DEBIAN_DIST="${DEBIAN_DIST:-focal}"
+		DEBIAN_DIST="${DEBIAN_DIST:-groovy}"
 	fi
 	echo "Current version : ${DEBIAN_DIST}"
 
@@ -788,6 +789,7 @@ fn_make_debian_common() {
 	fi
 
 	#debootstrap 1st
+	mount -o remount,exec,dev "${TARGET_OUTPUT}"
 	echo "debootstrap 1st"
 	PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true debootstrap --foreign ${DEBIAN_OPTION[@]} ${DEBIAN_DIST} "${TARGET_OUTPUT}" ${DEBIAN_MIRROR}
 
@@ -1318,23 +1320,21 @@ done
 if [ ! -e dist ]; then
 	mkdir -p dist
 fi
-if [ -e dist.img ]; then
-	if [ ! -e dist.img ]; then
-		truncate -s 5G dist.img
-		losetup -f ./dist.img
-		lo_dev="$(losetup -j ./dist.img | cut -d ':' -f 1)"
-		mkfs.ext4 -F ${lo_dev}
-		losetup -d ${lo_dev}
-		mount -o loop dist.img dist
-		touch dist/img
-	elif [ ! -e dist/img ]; then
-		mount -o loop dist.img dist
-	fi
+if [ ! -e dist.img ]; then
+	truncate -s 5G dist.img
+	losetup -f ./dist.img
+	lo_dev="$(losetup -j ./dist.img | cut -d ':' -f 1)"
+	mkfs.ext4 -F ${lo_dev}
+	losetup -d ${lo_dev}
+	mount -o loop,dev,exec dist.img dist
+	touch dist/img
+elif [ ! -e dist/img ]; then
+	mount -o loop,dev,exec dist.img dist
+fi
 
-	if [ ! -e dist/img ]; then
-		echo "Errof dist.img"
-		exit 1
-	fi
+if [ ! -e dist/img ]; then
+	echo "Errof dist.img"
+	exit 1
 fi
 
 #set default
