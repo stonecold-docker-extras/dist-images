@@ -71,10 +71,10 @@ fn_usage() {
 fn_target_unmount() {
 if [ -e "${TARGET_OUTPUT}" ]; then
 	if [ ! -z "$(mount | grep "on ${TARGET_OUTPUT}.* type")" ]; then
-		umount -R "${TARGET_OUTPUT}"
+		umount -R "${TARGET_OUTPUT}" || true
 		for a in $(mount | grep "on ${TARGET_OUTPUT}.* type" | sed 's/^.*on \(.*\) type.*$/\1/g')
 		do
-			umount ${a}
+			umount ${a} || true
 		done
 		if [ ! -z "$(mount | grep "on ${TARGET_OUTPUT}.* type")" ]; then
 			echo "Cannot remove ${TARGET_OUTPUT}"
@@ -235,6 +235,12 @@ fn_make_alpine() {
 
 	echo
 
+	#echo "Create chroot envoronment"
+	#mount -t proc /proc ${TARGET_OUTPUT}/proc/
+	#mount --rbind /sys ${TARGET_OUTPUT}/sys/
+	#mount --rbind /dev ${TARGET_OUTPUT}/dev
+	#echo
+
 	echo "Configuration"
 
 	#mirror
@@ -294,6 +300,10 @@ fn_make_alpine() {
 	echo "Clearing"
 
 	rm -rf ${TARGET_OUTPUT}/sbin/apk.static
+
+	#umount ${TARGET_OUTPUT}/proc/
+	#umount -R ${TARGET_OUTPUT}/sys/
+	#umount -R ${TARGET_OUTPUT}/dev
 
 	echo
 
@@ -734,6 +744,10 @@ fn_make_ubuntu() {
 	fi
 	echo "Current version : ${DEBIAN_DIST}"
 
+	if [ ! -e /usr/share/debootstrap/scripts/${DEBIAN_DIST} -a -e /usr/share/debootstrap/scripts/gutsy ]; then
+		ln -s gutsy /usr/share/debootstrap/scripts/${DEBIAN_DIST}
+	fi
+
 	local DEBIAN_MIRROR=
 	if [ ! -z "${TARGET_QEMU}" ]; then
 		DEBIAN_MIRROR="https://mirrors.xtom.com.hk/ubuntu-ports"
@@ -1001,6 +1015,11 @@ fn_update() {
 	nameserver 1.0.0.1
 	EOF
 
+	#echo "Create chroot envoronment"
+	#mount -t proc /proc ${TARGET_OUTPUT}/proc/
+	#mount --rbind /sys ${TARGET_OUTPUT}/sys/
+	#mount --rbind /dev ${TARGET_OUTPUT}/dev
+	#echo
 
 	mkdir -p ${TARGET_OUTPUT}/usr/bin ${TARGET_OUTPUT}/usr/sbin ${TARGET_OUTPUT}/usr/local/bin ${TARGET_OUTPUT}/usr/local/sbin
 
@@ -1055,7 +1074,7 @@ EOF
 		rm -rf ${TARGET_OUTPUT}/usr/local/bin/docker-sysusers ${TARGET_OUTPUT}/usr/local/bin/docker-tmpfiles
 		#cp extras/docker-sysusers ${TARGET_OUTPUT}/usr/local/bin/
 		#cp extras/docker-tmpfiles ${TARGET_OUTPUT}/usr/local/bin/
-		mount -o bind ${TARGET_OUTPUT} ${TARGET_OUTPUT}
+		#mount -o bind ${TARGET_OUTPUT} ${TARGET_OUTPUT}
 	elif [ -e "${TARGET_OUTPUT}/etc/os-release" -a ! -z "$(grep "ID=\(debian\|ubuntu\)" "${TARGET_OUTPUT}/etc/os-release")" ]; then
 		cp -f extras/docker-install.deb ${TARGET_OUTPUT}/usr/local/bin/docker-install
 	elif [ -e "${TARGET_OUTPUT}/etc/os-release" -a ! -z "$(grep "ID=busybox" "${TARGET_OUTPUT}/etc/os-release")" ]; then
@@ -1213,8 +1232,13 @@ EOF
 
 	rm -rf ${TARGET_OUTPUT}/core ${TARGET_OUTPUT}/*.core
 
+	#umount ${TARGET_OUTPUT}/proc/
+	#umount -R ${TARGET_OUTPUT}/sys/
+	#umount -R ${TARGET_OUTPUT}/dev
+
 	if [ -e "${TARGET_OUTPUT}/etc/arch-release" ]; then
-		mount -o bind "${TARGET_OUTPUT}" "${TARGET_OUTPUT}"
+		#mount -o bind "${TARGET_OUTPUT}" "${TARGET_OUTPUT}"
+		umount "${TARGET_OUTPUT}"
 	fi
 }
 
@@ -1325,15 +1349,14 @@ do
 done
 
 #create dist.img
-if [ ! -e dist ]; then
-	mkdir -p dist
-fi
+mkdir -p dist
 if [ ! -e dist.img ]; then
 	truncate -s 5G dist.img
-	losetup -f ./dist.img
-	lo_dev="$(losetup -j ./dist.img | cut -d ':' -f 1)"
-	mkfs.ext4 -F ${lo_dev}
-	losetup -d ${lo_dev}
+	mkfs.ext4 -F dist.img
+	#losetup -f ./dist.img
+	#lo_dev="$(losetup -j ./dist.img | cut -d ':' -f 1)"
+	#mkfs.ext4 -F ${lo_dev}
+	#losetup -d ${lo_dev}
 	mount -o loop,dev,exec dist.img dist
 	touch dist/img
 elif [ ! -e dist/img ]; then
@@ -1344,6 +1367,7 @@ if [ ! -e dist/img ]; then
 	echo "Errof dist.img"
 	exit 1
 fi
+mkdir -p dist
 
 #set default
 #TARGET_DISTRO="${TARGET_DISTRO:-arch}"
@@ -1485,6 +1509,10 @@ fi
 #	fi
 #fi
 
+if [ -e /sbin/apk ]; then
+	apk add util-linux
+fi
+
 #prepare
 fn_target_unmount
 
@@ -1551,9 +1579,5 @@ if [ ! -e /.dockerenv -a "${TARGET_PUSH}" = "Y" ]; then
 	fn_push
 fi
 
-if [ -e dist.img ]; then
-	if [ -e dist/img ]; then
-		umount dist
-	fi
-fi
+umount dist &> /dev/null || true
 
