@@ -94,7 +94,7 @@ fn_make_busybox() {
 	ALPINE_ARCH=${ALPINE_ARCH/armhf/armv7}
 	ALPINE_ARCH=${ALPINE_ARCH/aarch64/aarch64}
 
-	local busybox="https://mirror.xtom.com.hk/alpine/edge/main/${ALPINE_ARCH}/$(wget https://mirror.xtom.com.hk/alpine/edge/main/${ALPINE_ARCH}/ -q -O - | grep busybox-static | sed -e 's/^.*href="\([^"]*\)".*$/\1/g')"
+	local busybox="https://mirror.xtom.com.hk/alpine/latest-stable/main/${ALPINE_ARCH}/$(wget https://mirror.xtom.com.hk/alpine/latest-stable/main/${ALPINE_ARCH}/ -q -O - | grep busybox-static | sed -e 's/^.*href="\([^"]*\)".*$/\1/g')"
 	wget "${busybox}" -q -O - | tar zxf - -C ${TARGET_OUTPUT}/
 	rm -rf ${TARGET_OUTPUT}/.PKGINFO ${TARGET_OUTPUT}/.SIGN.RSA*
 
@@ -226,7 +226,7 @@ fn_make_alpine() {
 	local APK_VERSION="$(wget -q -O - ${ALPINE_MIRROR}/${ALPINE_DIST}/main/${ALPINE_ARCH}/APKINDEX.tar.gz | tar -Oxz | grep --text '^P:apk-tools-static$' -A1 | tail -n1 | cut -d: -f2)"
 	wget ${ALPINE_MIRROR}/${ALPINE_DIST}/main/${ALPINE_ARCH}/apk-tools-static-${APK_VERSION}.apk -q -O - | tar -xz -C "${TARGET_OUTPUT}" sbin/apk.static  2>/dev/null
 
-	run_cmd ${TARGET_OUTPUT}/sbin/apk.static --repository ${ALPINE_MIRROR}/${ALPINE_DIST}/main --no-cache --no-script --allow-untrusted --root "${TARGET_OUTPUT}" --initdb add busybox alpine-baselayout alpine-keys apk-tools libc-utils
+	run_cmd ${TARGET_OUTPUT}/sbin/apk.static --repository ${ALPINE_MIRROR}/latest-stable/main --no-cache --no-script --allow-untrusted --root "${TARGET_OUTPUT}" --initdb add busybox alpine-baselayout alpine-keys apk-tools libc-utils
 	#for link in $(run_cmd "${TARGET_OUTPUT}"/bin/busybox --list-full); do
 	#	[ -e "${TARGET_OUTPUT}"/$link ] || ln -s /bin/busybox "${TARGET_OUTPUT}"/${link}
 	#done
@@ -249,6 +249,14 @@ fn_make_alpine() {
 		echo "${ALPINE_MIRROR}/${ALPINE_DIST}/main" > ${TARGET_OUTPUT}/etc/apk/repositories
 		echo "${ALPINE_MIRROR}/${ALPINE_DIST}/community" >> ${TARGET_OUTPUT}/etc/apk/repositories
 	fi
+	echo "@stablemain ${ALPINE_MIRROR}/latest-stable/main" >> ${TARGET_OUTPUT}/etc/apk/repositories
+	echo "@stablecommunity  ${ALPINE_MIRROR}/latest-stable/community" >> ${TARGET_OUTPUT}/etc/apk/repositories
+	echo "@edgemain ${ALPINE_MIRROR}/edge/main" >> ${TARGET_OUTPUT}/etc/apk/repositories
+	echo "@edgecommunity ${ALPINE_MIRROR}/edge/community" >> ${TARGET_OUTPUT}/etc/apk/repositories
+	echo "@edgetesting ${ALPINE_MIRROR}/edge/testing" >> ${TARGET_OUTPUT}/etc/apk/repositories
+
+	#pin musl
+	echo "musl@stablemain" >> ${TARGET_OUTPUT}/etc/apk/world
 
 	#resolve
 	cat <<- EOF > ${TARGET_OUTPUT}/etc/resolv.conf
@@ -328,7 +336,7 @@ fn_make_entware() {
 	fi
 
 	#busybox
-	local busybox="https://mirror.xtom.com.hk/alpine/edge/main/${ALPINE_ARCH}/$(wget https://mirror.xtom.com.hk/alpine/edge/main/${ALPINE_ARCH}/ -q -O - | grep busybox-static | sed -e 's/^.*href="\([^"]*\)".*$/\1/g')"
+	local busybox="https://mirror.xtom.com.hk/alpine/latest-stable/main/${ALPINE_ARCH}/$(wget https://mirror.xtom.com.hk/alpine/latest-stable/main/${ALPINE_ARCH}/ -q -O - | grep busybox-static | sed -e 's/^.*href="\([^"]*\)".*$/\1/g')"
 	wget "${busybox}" -q -O - | tar zxf - -C ${TARGET_OUTPUT}/
 	rm -rf ${TARGET_OUTPUT}/.PKGINFO ${TARGET_OUTPUT}/.SIGN.RSA*
 	mv ${TARGET_OUTPUT}/bin ${TARGET_OUTPUT}/bbin
