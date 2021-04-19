@@ -223,15 +223,15 @@ fn_make_alpine() {
 			PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin LANG=C LC_ALL=C chroot "${TARGET_OUTPUT}" "${@}"
 		}
 	fi
-	local APK_VERSION="$(wget -q -O - ${ALPINE_MIRROR}/${ALPINE_DIST}/main/${ALPINE_ARCH}/APKINDEX.tar.gz | tar -Oxz | grep --text '^P:apk-tools-static$' -A1 | tail -n1 | cut -d: -f2)"
-	wget ${ALPINE_MIRROR}/${ALPINE_DIST}/main/${ALPINE_ARCH}/apk-tools-static-${APK_VERSION}.apk -q -O - | tar -xz -C "${TARGET_OUTPUT}" sbin/apk.static  2>/dev/null
+	local APK_VERSION="$(wget -q -O - ${ALPINE_MIRROR}/latest-stable/main/${ALPINE_ARCH}/APKINDEX.tar.gz | tar -Oxz | grep --text '^P:apk-tools-static$' -A1 | tail -n1 | cut -d: -f2)"
+	wget ${ALPINE_MIRROR}/latest-stable/main/${ALPINE_ARCH}/apk-tools-static-${APK_VERSION}.apk -q -O - | tar -xz -C "${TARGET_OUTPUT}" sbin/apk.static  2>/dev/null
 
 	run_cmd ${TARGET_OUTPUT}/sbin/apk.static --repository ${ALPINE_MIRROR}/latest-stable/main --no-cache --no-script --allow-untrusted --root "${TARGET_OUTPUT}" --initdb add busybox alpine-baselayout alpine-keys apk-tools libc-utils
 	#for link in $(run_cmd "${TARGET_OUTPUT}"/bin/busybox --list-full); do
 	#	[ -e "${TARGET_OUTPUT}"/$link ] || ln -s /bin/busybox "${TARGET_OUTPUT}"/${link}
 	#done
 	chroot_cmd /bin/busybox --install -s
-	run_cmd ${TARGET_OUTPUT}/sbin/apk.static --repository ${ALPINE_MIRROR}/${ALPINE_DIST}/main --no-cache --allow-untrusted --root "${TARGET_OUTPUT}" --stdout --quiet fetch alpine-base | tar -zx -C "${TARGET_OUTPUT}" etc/
+	run_cmd ${TARGET_OUTPUT}/sbin/apk.static --repository ${ALPINE_MIRROR}/latest-stable/main --no-cache --allow-untrusted --root "${TARGET_OUTPUT}" --stdout --quiet fetch alpine-base | tar -zx -C "${TARGET_OUTPUT}" etc/
 
 	echo
 
@@ -262,7 +262,13 @@ fn_make_alpine() {
 	echo "@edgetesting ${ALPINE_MIRROR}/edge/testing" >> ${TARGET_OUTPUT}/etc/apk/repositories
 
 	#pin musl
-	echo "musl@stablemain" >> ${TARGET_OUTPUT}/etc/apk/world
+	musl_ver="$(cat ${TARGET_OUTPUT}/lib/apk/db/installed | grep '^P:musl$' -A 10 | grep '^V:' | head -1 | sed -e 's/^V://g')"
+	if [ ! -z "${musl_ver}" ]; then
+		sed -e '/^musl$/d' ${TARGET_OUTPUT}/etc/apk/world
+		sed -e '/^musl-utils$/d' ${TARGET_OUTPUT}/etc/apk/world
+		echo "musl=${musl_ver}" >> ${TARGET_OUTPUT}/etc/apk/world
+		echo "musl-utils=${musl_ver}" >> ${TARGET_OUTPUT}/etc/apk/world
+	fi
 
 	#resolve
 	cat <<- EOF > ${TARGET_OUTPUT}/etc/resolv.conf
@@ -1175,14 +1181,6 @@ EOF
 				PATH="${PATH_CHROOT}" LANG=C LC_ALL=C ${CHROOT_CMD} "${TARGET_OUTPUT}" /bin/sh -c "docker-install -r -u -f -c"
 			fi
 		else
-			if [ -e "${TARGET_OUTPUT}/etc/alpine-release" ]; then
-				if [ ! -z "${TARGET_QEMU}" ]; then
-					QEMU_EXECVE=1 PATH="${PATH_CHROOT}" LANG=C LC_ALL=C ${CHROOT_CMD} "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "apk --no-cache --allow-untrusted --quiet add musl@stablemain"
-				else
-					PATH="${PATH_CHROOT}" LANG=C LC_ALL=C ${CHROOT_CMD} "${TARGET_OUTPUT}" /bin/sh -c "apk --no-cache --allow-untrusted --quiet add musl@stablemain"
-				fi
-			fi
-
 			if [ ! -z "${TARGET_QEMU}" ]; then
 				QEMU_EXECVE=1 PATH="${PATH_CHROOT}" LANG=C LC_ALL=C ${CHROOT_CMD} "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "docker-install -r -u -c"
 			else
