@@ -1175,6 +1175,14 @@ EOF
 				PATH="${PATH_CHROOT}" LANG=C LC_ALL=C ${CHROOT_CMD} "${TARGET_OUTPUT}" /bin/sh -c "docker-install -r -u -f -c"
 			fi
 		else
+			if [ -e "${TARGET_OUTPUT}/etc/alpine-release" ]; then
+				if [ ! -z "${TARGET_QEMU}" ]; then
+					QEMU_EXECVE=1 PATH="${PATH_CHROOT}" LANG=C LC_ALL=C ${CHROOT_CMD} "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "apk --no-cache --allow-untrusted --quiet add musl@stablemain"
+				else
+					PATH="${PATH_CHROOT}" LANG=C LC_ALL=C ${CHROOT_CMD} "${TARGET_OUTPUT}" /bin/sh -c "apk --no-cache --allow-untrusted --quiet add musl@stablemain"
+				fi
+			fi
+
 			if [ ! -z "${TARGET_QEMU}" ]; then
 				QEMU_EXECVE=1 PATH="${PATH_CHROOT}" LANG=C LC_ALL=C ${CHROOT_CMD} "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "docker-install -r -u -c"
 			else
@@ -1350,24 +1358,40 @@ done
 
 #create dist.img
 mkdir -p dist
-if [ ! -e dist.img ]; then
-	truncate -s 5G dist.img
-	mkfs.ext4 -F dist.img
-	#losetup -f ./dist.img
-	#lo_dev="$(losetup -j ./dist.img | cut -d ':' -f 1)"
-	#mkfs.ext4 -F ${lo_dev}
-	#losetup -d ${lo_dev}
-	mount -o loop,dev,exec dist.img dist
-	touch dist/img
-elif [ ! -e dist/img ]; then
-	mount -o loop,dev,exec dist.img dist
-fi
+pushd "$(realpath "$(pwd)")" &> /dev/null
+mntopt=
+while true
+do
+	if [ ! -z "$(mount | grep "on $(pwd) ")" ]; then
+		mntopt="$(mount | grep "on $(pwd) ")"
+		break
+	fi
+	if [ "$(pwd)" = "/" ]; then
+		break;
+	fi
 
-if [ ! -e dist/img ]; then
-	echo "Errof dist.img"
-	exit 1
+	cd ..
+done
+popd &> /dev/null
+if [ "${mntopt}" != "${mntopt/noexec/}" -o "${mntopt}" != "${mntopt/nodev/}" ]; then
+	if [ ! -e dist.img ]; then
+		truncate -s 5G dist.img
+		mkfs.ext4 -F dist.img
+		#losetup -f ./dist.img
+		#lo_dev="$(losetup -j ./dist.img | cut -d ':' -f 1)"
+		#mkfs.ext4 -F ${lo_dev}
+		#losetup -d ${lo_dev}
+		mount -o loop,dev,exec dist.img dist
+		touch dist/img
+	elif [ ! -e dist/img ]; then
+		mount -o loop,dev,exec dist.img dist
+	fi
+
+	if [ ! -e dist/img ]; then
+		echo "Errof dist.img"
+		exit 1
+	fi
 fi
-mkdir -p dist
 
 #set default
 #TARGET_DISTRO="${TARGET_DISTRO:-arch}"
