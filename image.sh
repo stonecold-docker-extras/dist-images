@@ -261,14 +261,14 @@ fn_make_alpine() {
 	echo "@edgecommunity ${ALPINE_MIRROR}/edge/community" >> ${TARGET_OUTPUT}/etc/apk/repositories
 	echo "@edgetesting ${ALPINE_MIRROR}/edge/testing" >> ${TARGET_OUTPUT}/etc/apk/repositories
 
-	#pin musl
-	musl_ver="$(cat ${TARGET_OUTPUT}/lib/apk/db/installed | grep '^P:musl$' -A 10 | grep '^V:' | head -1 | sed -e 's/^V://g')"
-	if [ ! -z "${musl_ver}" ]; then
-		sed -e '/^musl$/d' ${TARGET_OUTPUT}/etc/apk/world
-		sed -e '/^musl-utils$/d' ${TARGET_OUTPUT}/etc/apk/world
-		echo "musl=${musl_ver}" >> ${TARGET_OUTPUT}/etc/apk/world
-		echo "musl-utils=${musl_ver}" >> ${TARGET_OUTPUT}/etc/apk/world
-	fi
+	##pin musl
+	#musl_ver="$(cat ${TARGET_OUTPUT}/lib/apk/db/installed | grep '^P:musl$' -A 10 | grep '^V:' | head -1 | sed -e 's/^V://g')"
+	#if [ ! -z "${musl_ver}" ]; then
+	#	sed -e '/^musl$/d' ${TARGET_OUTPUT}/etc/apk/world
+	#	sed -e '/^musl-utils$/d' ${TARGET_OUTPUT}/etc/apk/world
+	#	echo "musl=${musl_ver}" >> ${TARGET_OUTPUT}/etc/apk/world
+	#	echo "musl-utils=${musl_ver}" >> ${TARGET_OUTPUT}/etc/apk/world
+	#fi
 
 	#resolve
 	cat <<- EOF > ${TARGET_OUTPUT}/etc/resolv.conf
