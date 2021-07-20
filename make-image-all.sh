@@ -2,7 +2,7 @@
 
 for dist in debian ubuntu alpine entware
 do
-	for arch in x64 aarch64 armhf
+	for arch in x64 aarch64
 	do
 		echo "${dist} ${arch}"
 		./image.sh -d "${dist}" -a "${arch}" -m -q -v $@
