@@ -1097,9 +1097,9 @@ EOF
 		ln -sf docker-build-aarch64 "${TARGET_OUTPUT}/usr/local/bin/docker-build-start"
 		ln -sf docker-build-aarch64 "${TARGET_OUTPUT}/usr/local/bin/docker-build-end"
 	else
-		cp -f extras/docker-build-x64 "${TARGET_OUTPUT}/usr/local/bin/docker-build"
-		ln -sf docker-build "${TARGET_OUTPUT}/usr/local/bin/docker-build-start"
-		ln -sf docker-build "${TARGET_OUTPUT}/usr/local/bin/docker-build-end"
+		cp -f extras/docker-build-x64 "${TARGET_OUTPUT}/usr/local/bin/docker-build-x64"
+		ln -sf docker-build-x64 "${TARGET_OUTPUT}/usr/local/bin/docker-build-start"
+		ln -sf docker-build-x64 "${TARGET_OUTPUT}/usr/local/bin/docker-build-end"
 	fi
 
 	#docker-adduser
