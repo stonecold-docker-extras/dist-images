@@ -651,6 +651,8 @@ fn_make_arch() {
 		chroot_cmd /usr/bin/systemd-sysusers
 	fi
 
+	chroot_cmd passwd -d root
+
 	#update-ca-trust
 	#chroot_cmd /bin/sh -c "update-ca-trust"
 	chroot_cmd update-ca-trust
