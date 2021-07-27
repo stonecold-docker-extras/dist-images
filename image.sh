@@ -686,14 +686,14 @@ fn_make_arch() {
 	#skel
 	cp -ar ${TARGET_OUTPUT}/etc/skel/. ${TARGET_OUTPUT}/root/
 
-	#yaourt
-	if [ -e extras/package-query-*-${ARCH_ARCH}.pkg.tar.xz -a -e extras/yaourt-*-any.pkg.tar.xz ]; then
-		cp extras/package-query-*-${ARCH_ARCH}.pkg.tar.xz ${TARGET_OUTPUT}/
-		cp extras/yaourt-*-any.pkg.tar.xz ${TARGET_OUTPUT}/
-		#chroot_cmd /bin/sh -c "/usr/bin/pacman -Sy --noconfirm ; /usr/bin/pacman -U --noconfirm --asdeps /package-query-*; /usr/bin/pacman -U --noconfirm /yaourt-*-any.pkg.tar.xz"
-		chroot_cmd /usr/bin/pacman -Sy --noconfirm ; /usr/bin/pacman -U --noconfirm --asdeps /package-query-*; /usr/bin/pacman -U --noconfirm /yaourt-*-any.pkg.tar.xz
-		rm -rf ${TARGET_OUTPUT}/*.pkg.tar.xz
-	fi
+	##yaourt
+	#if [ -e extras/package-query-*-${ARCH_ARCH}.pkg.tar.xz -a -e extras/yaourt-*-any.pkg.tar.xz ]; then
+	#	cp extras/package-query-*-${ARCH_ARCH}.pkg.tar.xz ${TARGET_OUTPUT}/
+	#	cp extras/yaourt-*-any.pkg.tar.xz ${TARGET_OUTPUT}/
+	#	#chroot_cmd /bin/sh -c "/usr/bin/pacman -Sy --noconfirm ; /usr/bin/pacman -U --noconfirm --asdeps /package-query-*; /usr/bin/pacman -U --noconfirm /yaourt-*-any.pkg.tar.xz"
+	#	chroot_cmd /usr/bin/pacman -Sy --noconfirm ; /usr/bin/pacman -U --noconfirm --asdeps /package-query-*; /usr/bin/pacman -U --noconfirm /yaourt-*-any.pkg.tar.xz
+	#	rm -rf ${TARGET_OUTPUT}/*.pkg.tar.xz
+	#fi
 
 	#makepkg
 	[ -e /usr/bin/makepkg ] && sed -i -e 's/(( EUID == 0 ))/false /g' /usr/bin/makepkg
