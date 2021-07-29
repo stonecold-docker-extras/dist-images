@@ -543,8 +543,8 @@ fn_make_arch() {
 		PACMAN_EXTRA_PKGS="archlinuxarm-keyring"
 		ARCH_KEYRING="archlinuxarm"
 	else
-		#PACMAN_MIRROR='http://ftp.lanet.kr/pub/archlinux'
-		PACMAN_MIRROR='http://ftp.harukasan.org/archlinux'
+		PACMAN_MIRROR='http://ftp.lanet.kr/pub/archlinux'
+		#PACMAN_MIRROR='http://ftp.harukasan.org/archlinux'
 		PACMAN_MIRRORLIST="Server = ${PACMAN_MIRROR}/\$repo/os/\$arch"
 		PACMAN_EXTRA_PKGS=""
 		ARCH_KEYRING="archlinux"
@@ -726,8 +726,9 @@ fn_make_debian() {
 
 	#local DEBIAN_MIRROR=http://ftp.kr.debian.org/debian
 	#local DEBIAN_MIRROR=http://ftp.daumkakao.com/debian
-	#local DEBIAN_MIRROR="http://ftp.lanet.kr/pub/debian"
-	local DEBIAN_MIRROR=http://ftp.harukasan.org/debian
+	#local DEBIAN_MIRROR=http://ftp.lanet.kr/pub/debian
+	#local DEBIAN_MIRROR=http://ftp.harukasan.org/debian
+	local DEBIAN_MIRROR=http://mirror.kakao.com/debian
 
 	local DEBIAN_EXTRA=""
 	#local DEBIAN_EXTRA=locales
@@ -758,14 +759,15 @@ fn_make_ubuntu() {
 
 	local DEBIAN_MIRROR=
 	if [ ! -z "${TARGET_QEMU}" ]; then
-		DEBIAN_MIRROR="https://mirrors.xtom.com.hk/ubuntu-ports"
+		#DEBIAN_MIRROR=https://mirrors.xtom.com.hk/ubuntu-ports
 		#DEBIAN_MIRROR=http://ports.ubuntu.com/ubuntu-ports
-		#DEBIAN_MIRROR=http://ftp.harukasan.org/ubuntu-ports
+		DEBIAN_MIRROR=http://ftp.harukasan.org/ubuntu-ports
 	else
 		#DEBIAN_MIRROR=http://kr.archive.ubuntu.com/ubuntu
 		#DEBIAN_MIRROR=http://ftp.daumkakao.com/ubuntu
-		#DEBIAN_MIRROR="http://ftp.lanet.kr/pub/ubuntu"
-		DEBIAN_MIRROR=http://ftp.harukasan.org/ubuntu
+		#DEBIAN_MIRROR=http://ftp.lanet.kr/pub/ubuntu
+		#DEBIAN_MIRROR=http://ftp.harukasan.org/ubuntu
+		DEBIAN_MIRROR=http://mirror.kakao.com/ubuntu
 	fi
 
 	local DEBIAN_EXTRA=""
@@ -1037,7 +1039,6 @@ fn_update() {
 	#qemu
 	if [ ! -z "${TARGET_QEMU}" ]; then
 		cp -f extras/${TARGET_QEMU} "${TARGET_OUTPUT}/usr/bin/"
-		#cp -f extras/${TARGET_QEMU} "${TARGET_OUTPUT}/usr/local/bin/"
 		ln "${TARGET_OUTPUT}/usr/bin/${TARGET_QEMU}" "${TARGET_OUTPUT}/usr/local/bin/${TARGET_QEMU}"
 		chmod 4755 "${TARGET_OUTPUT}/usr/local/bin/${TARGET_QEMU}"
 		cat << EOF > ${TARGET_OUTPUT}/usr/local/bin/sudo
@@ -1430,11 +1431,28 @@ fi
 TARGET_LOCALE=${TARGET_LOCALE:-ko_KR.UTF-8}
 TARGET_TIMEZONE=${TARGET_TIMEZONE:-Asia/Seoul}
 if [ -z "${TARGET_EDITION}" ]; then
-	TARGET_NAME=${TARGET_NAME:-forumi0721/${TARGET_DISTRO}-${TARGET_ARCH}-base}
+	TARGET_NAME=${TARGET_NAME:-forumi0721/${TARGET_DISTRO}-base}
+	if [ -z "${TARGET_TAG}" ]; then
+		if [ "${TARGET_ARCH}" = "x64" ]; then
+			TARGET_TAG=latest
+		else
+			TARGET_TAG=${TARGET_ARCH}
+		fi
+	else
+		TARGET_TAG=${TARGET_TAG:-latest}
+	fi
 else
-	TARGET_NAME=${TARGET_NAME:-forumi0721/${TARGET_DISTRO}-${TARGET_ARCH}-base-${TARGET_EDITION}}
+	TARGET_NAME=${TARGET_NAME:-forumi0721/${TARGET_DISTRO}-base}
+	if [ -z "${TARGET_TAG}" ]; then
+		if [ "${TARGET_ARCH}" = "x64" ]; then
+			TARGET_TAG=x64${TARGET_EDITION}}
+		else
+			TARGET_TAG=${TARGET_ARCH}${TARGET_EDITION}
+		fi
+	else
+		TARGET_TAG=${TARGET_TAG:-latest}
+	fi
 fi
-TARGET_TAG=${TARGET_TAG:-latest}
 if [ -e "${TARGET_OUTPUT}" ]; then
 	TARGET_MAKE=${TARGET_MAKE:-N}
 else
