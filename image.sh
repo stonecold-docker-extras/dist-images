@@ -625,7 +625,9 @@ fn_make_arch() {
 	find ${TARGET_OUTPUT} -name \*.pacnew -exec rm -rf {} \;
 
 	rm -rf ${TARGET_OUTPUT}/.BUILDINFO ${TARGET_OUTPUT}/.INSTALL ${TARGET_OUTPUT}/.MTREE ${TARGET_OUTPUT}/.PKGINFO
-	cp ${PACMAN_CONF} ${TARGET_OUTPUT}/
+	if [ ! -e ${TARGET_OUTPUT}/pacman.conf ]; then
+		cp ${PACMAN_CONF} ${TARGET_OUTPUT}/
+	fi
 	#chroot_cmd /bin/sh -c "/usr/bin/pacman -Suy --noconfirm --overwrite \"*\" ${PACMAN_BASE_PKGS} ${PACMAN_EXTRA_PKGS}"
 	chroot_cmd /usr/bin/pacman -Suy --noconfirm --overwrite "*" ${PACMAN_BASE_PKGS} ${PACMAN_EXTRA_PKGS}
 	#chroot_cmd /bin/sh -c "/usr/bin/haveged ; /usr/bin/rm -fr /etc/pacman.d/gnupg ; /usr/bin/pacman-key --init ; /usr/bin/pacman-key --populate ${ARCH_KEYRING} ; /usr/bin/pkill haveged ; /usr/bin/pkill gpg-agent"
@@ -702,7 +704,7 @@ fn_make_arch() {
 
 
 	echo "Clearing"
-	rm -rf "${PACMAN_CONF}"
+	rm -rf "${TARGET_OUTPUT}/pacman.conf"
 	if [ ! -z "${PACMAN_REMOVE_PKGS}" ]; then
 		#chroot_cmd /bin/sh -c "/usr/bin/pacman -Rsn --noconfirm ${PACMAN_REMOVE_PKGS}"
 		chroot_cmd /usr/bin/pacman -Rsn --noconfirm ${PACMAN_REMOVE_PKGS}
