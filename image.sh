@@ -536,15 +536,14 @@ fn_make_arch() {
 	ARCH_ARCH=${ARCH_ARCH/aarch64/aarch64}
 
 	if [ "${ARCH_ARCH}" = "armv7h" -o "${ARCH_ARCH}" = "aarch64" ]; then
-		#PACMAN_MIRRORLIST='Server = http://mirror.archlinuxarm.org/$arch/$repo'
-		#PACMAN_MIRRORLIST='Server = http://sg.mirror.archlinuxarm.org/$arch/$repo'
-		PACMAN_MIRROR='http://ca.us.mirror.archlinuxarm.org'
+		PACMAN_MIRROR=http://ca.us.mirror.archlinuxarm.org
 		PACMAN_MIRRORLIST="Server = ${PACMAN_MIRROR}/\$arch/\$repo"
 		PACMAN_EXTRA_PKGS="archlinuxarm-keyring"
 		ARCH_KEYRING="archlinuxarm"
 	else
-		PACMAN_MIRROR='http://ftp.lanet.kr/pub/archlinux'
-		#PACMAN_MIRROR='http://ftp.harukasan.org/archlinux'
+		#PACMAN_MIRROR=http://ftp.lanet.kr/pub/archlinux
+		#PACMAN_MIRROR=http://ftp.harukasan.org/archlinux
+		PACMAN_MIRROR=http://mirror.anigil.com/archlinux
 		PACMAN_MIRRORLIST="Server = ${PACMAN_MIRROR}/\$repo/os/\$arch"
 		PACMAN_EXTRA_PKGS=""
 		ARCH_KEYRING="archlinux"
@@ -730,7 +729,8 @@ fn_make_debian() {
 	#local DEBIAN_MIRROR=http://ftp.daumkakao.com/debian
 	#local DEBIAN_MIRROR=http://ftp.lanet.kr/pub/debian
 	#local DEBIAN_MIRROR=http://ftp.harukasan.org/debian
-	local DEBIAN_MIRROR=http://mirror.kakao.com/debian
+	#local DEBIAN_MIRROR=http://mirror.kakao.com/debian
+	local DEBIAN_MIRROR=http://mirror.anigil.com/debian
 
 	local DEBIAN_EXTRA=""
 	#local DEBIAN_EXTRA=locales
@@ -763,13 +763,15 @@ fn_make_ubuntu() {
 	if [ ! -z "${TARGET_QEMU}" ]; then
 		#DEBIAN_MIRROR=https://mirrors.xtom.com.hk/ubuntu-ports
 		#DEBIAN_MIRROR=http://ports.ubuntu.com/ubuntu-ports
-		DEBIAN_MIRROR=http://ftp.harukasan.org/ubuntu-ports
+		#DEBIAN_MIRROR=http://ftp.harukasan.org/ubuntu-ports
+		DEBIAN_MIRROR=http://mirror.anigil.com/ubuntu-ports
 	else
 		#DEBIAN_MIRROR=http://kr.archive.ubuntu.com/ubuntu
 		#DEBIAN_MIRROR=http://ftp.daumkakao.com/ubuntu
 		#DEBIAN_MIRROR=http://ftp.lanet.kr/pub/ubuntu
 		#DEBIAN_MIRROR=http://ftp.harukasan.org/ubuntu
-		DEBIAN_MIRROR=http://mirror.kakao.com/ubuntu
+		#DEBIAN_MIRROR=http://mirror.kakao.com/ubuntu
+		DEBIAN_MIRROR=http://mirror.anigil.com/ubuntu
 	fi
 
 	local DEBIAN_EXTRA=""
