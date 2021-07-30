@@ -43,7 +43,7 @@ fn_run_docker() {
 	fi
 
 	[ "${DEBUG}" = "Y" ] && set -x
-	docker run  --rm --sig-proxy=false --privileged -e RUN_USER_NAME=${user} -e RUN_USER_UID=${uid} -e RUN_USER_GID=${gid} -e LANG=${lang} -e LC_ALL=${lc_all} -v ${workdir}:${dockerdir} -v ${workscript}:/usr/local/bin/docker-run-alt -v ${workdir}/extras/qemu-arm-static:/usr/bin/qemu-arm-static -v ${workdir}/extras/qemu-aarch64-static:/usr/bin/qemu-aarch64-static -h ${dockername} --name ${dockername} -e DOCKER_WORKDIR=${dockerdir} forumi0721alpinex64/alpine-x64-dev:latest - "${@}"
+	docker run  --rm --sig-proxy=false --privileged -e RUN_USER_NAME=${user} -e RUN_USER_UID=${uid} -e RUN_USER_GID=${gid} -e LANG=${lang} -e LC_ALL=${lc_all} -v ${workdir}:${dockerdir} -v ${workscript}:/usr/local/bin/docker-run-alt -v ${workdir}/extras/qemu-arm-static:/usr/bin/qemu-arm-static -v ${workdir}/extras/qemu-aarch64-static:/usr/bin/qemu-aarch64-static -h ${dockername} --name ${dockername} -e DOCKER_WORKDIR=${dockerdir} forumi0721/alpine-dev:latest - "${@}"
 	[ "${DEBUG}" = "Y" ] && set +x
 }
 
@@ -1443,7 +1443,7 @@ else
 fi
 TARGET_TAG=${TARGET_TAG:-latest}
 if [ -z "${TARGET_OUTPUT}" ]; then
-	TARGET_OUTPUT=dist-${TARGET_DISTRO}-${TARGET_ARCH}-${TARGET_TAG}
+	TARGET_OUTPUT=dist-${TARGET_DISTRO}-${TARGET_TAG}
 	TARGET_OUTPUT="dist/${TARGET_OUTPUT}"
 	TARGET_OUTPUT=$(realpath ${TARGET_OUTPUT})
 fi
