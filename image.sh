@@ -1433,7 +1433,7 @@ else
 	TARGET_NAME=${TARGET_NAME:-forumi0721/${TARGET_DISTRO}-base}
 	if [ -z "${TARGET_TAG}" ]; then
 		if [ "${TARGET_ARCH}" = "x64" ]; then
-			TARGET_TAG=x64${TARGET_EDITION}}
+			TARGET_TAG=x64${TARGET_EDITION}
 		else
 			TARGET_TAG=${TARGET_ARCH}${TARGET_EDITION}
 		fi
