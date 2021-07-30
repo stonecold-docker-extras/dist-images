@@ -536,7 +536,8 @@ fn_make_arch() {
 	ARCH_ARCH=${ARCH_ARCH/aarch64/aarch64}
 
 	if [ "${ARCH_ARCH}" = "armv7h" -o "${ARCH_ARCH}" = "aarch64" ]; then
-		PACMAN_MIRROR=http://ca.us.mirror.archlinuxarm.org
+		#PACMAN_MIRROR=http://ca.us.mirror.archlinuxarm.org
+		PACMAN_MIRROR=http://tw.mirror.archlinuxarm.org
 		PACMAN_MIRRORLIST="Server = ${PACMAN_MIRROR}/\$arch/\$repo"
 		PACMAN_EXTRA_PKGS="archlinuxarm-keyring"
 		ARCH_KEYRING="archlinuxarm"
