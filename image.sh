@@ -1416,23 +1416,6 @@ fi
 if [ "${TARGET_ARCH}" != "x64" -a "${TARGET_ARCH}" != "armhf" -a "${TARGET_ARCH}" != "aarch64" ]; then
 	fn_usage
 fi
-if [ -z "${TARGET_OUTPUT}" ]; then
-	if [ ! -z "${TARGET_TAG}" ]; then
-		if [ -z "${TARGET_EDITION}" ]; then
-			TARGET_OUTPUT=dist-${TARGET_DISTRO}-${TARGET_ARCH}-${TARGET_TAG}
-		else
-			TARGET_OUTPUT=dist-${TARGET_DISTRO}-${TARGET_ARCH}-${TARGET_EDITION}-${TARGET_TAG}
-		fi
-	else
-		if [ -z "${TARGET_EDITION}" ]; then
-			TARGET_OUTPUT=dist-${TARGET_DISTRO}-${TARGET_ARCH}
-		else
-			TARGET_OUTPUT=dist-${TARGET_DISTRO}-${TARGET_ARCH}-${TARGET_EDITION}
-		fi
-	fi
-	TARGET_OUTPUT="dist/${TARGET_OUTPUT}"
-	TARGET_OUTPUT=$(realpath ${TARGET_OUTPUT})
-fi
 TARGET_LOCALE=${TARGET_LOCALE:-ko_KR.UTF-8}
 TARGET_TIMEZONE=${TARGET_TIMEZONE:-Asia/Seoul}
 if [ -z "${TARGET_EDITION}" ]; then
@@ -1457,6 +1440,12 @@ else
 	else
 		TARGET_TAG=${TARGET_TAG:-latest}
 	fi
+fi
+TARGET_TAG=${TARGET_TAG:-latest}
+if [ -z "${TARGET_OUTPUT}" ]; then
+	TARGET_OUTPUT=dist-${TARGET_DISTRO}-${TARGET_ARCH}-${TARGET_TAG}
+	TARGET_OUTPUT="dist/${TARGET_OUTPUT}"
+	TARGET_OUTPUT=$(realpath ${TARGET_OUTPUT})
 fi
 if [ -e "${TARGET_OUTPUT}" ]; then
 	TARGET_MAKE=${TARGET_MAKE:-N}

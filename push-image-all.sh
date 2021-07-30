@@ -12,8 +12,12 @@ do
 		./image.sh -d debian -a x64 -e stable -p -q -v $@
 	fi
 	if [ "${dist}" = "ubuntu" ]; then
+		echo "${dist} x64-focal"
+		./image.sh -d ubuntu -a x64 -e focal -p -q -v $@
 		echo "${dist} x64-bionic"
 		./image.sh -d ubuntu -a x64 -e bionic -p -q -v $@
+		echo "${dist} x64-xenial"
+		./image.sh -d ubuntu -a x64 -e xenial -p -q -v $@
 	fi
 done
 

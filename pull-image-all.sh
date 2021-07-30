@@ -12,8 +12,12 @@ do
 		docker pull forumi0721/ubnutu-x64-base-stable
 	fi
 	if [ "${dist}" = "ubuntu" ]; then
+		echo "${dist} x64-focal"
+		docker pull forumi0721/ubnutu-x64-base-focal
 		echo "${dist} x64-bionic"
 		docker pull forumi0721/ubnutu-x64-base-bionic
+		echo "${dist} x64-xenial"
+		docker pull forumi0721/ubnutu-x64-base-xenial
 	fi
 done
 
