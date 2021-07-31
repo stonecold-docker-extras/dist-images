@@ -752,7 +752,8 @@ fn_make_ubuntu() {
 		#DEBIAN_DIST="$(curl -sSL http://ftp.kaist.ac.kr/ubuntu/dists/ | grep -v 'backports' | grep -v 'proposed' | grep -v 'security' | grep -v 'updates' | grep '<tr><td class="n">' | tail -1  | sed -e 's/^<tr><td class="n"><a href="\(.*\)\/">.*$/\1/g')"
 		#DEBIAN_DIST="${DEBIAN_DIST:-eoan}"
 		#DEBIAN_DIST="${DEBIAN_DIST:-focal}"
-		DEBIAN_DIST="${DEBIAN_DIST:-groovy}"
+		#DEBIAN_DIST="${DEBIAN_DIST:-groovy}"
+		DEBIAN_DIST="${DEBIAN_DIST:-hirsute}"
 	fi
 	echo "Current version : ${DEBIAN_DIST}"
 
