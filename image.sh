@@ -504,32 +504,6 @@ fn_make_entware() {
 }
 
 fn_make_arch() {
-	#if ! pacstrap -h &>/dev/null ; then
-	#	echo "Could not find pacstrap. Run pacman -S arch-install-scripts"
-	#	exit 1
-	#fi
-
-	#if ! arch-chroot -h &>/dev/null ; then
-	#	echo "Could not find arch-chroot. Run pacman -S arch-install-scripts"
-	#	exit 1
-	#fi
-
-	#if ! pacman -h &>/dev/null ; then
-	#	echo "Could not find pacman. Run pacman -S arch-install-scripts"
-	#	exit 1
-	#fi
-
-	echo "Bootstrap"
-
-	local PACMAN_MIRROR=
-	local PACMAN_MIRRORLIST=
-	#local PACMAN_BASE_PKGS=(bash bzip2 coreutils diffutils filesystem findutils gettext glibc grep gzip less pacman perl procps-ng sed shadow systemd)
-	local PACMAN_BASE_PKGS="bash coreutils diffutils filesystem findutils gettext glibc grep gzip less pacman procps-ng sed systemd haveged"
-	#local PACMAN_REMOVE_PKGS="diffutils gettext gzip less procps-ng haveged"
-	local PACMAN_REMOVE_PKGS="gzip less procps-ng haveged"
-	local PACMAN_EXTRA_PKGS=""
-	local ARCH_KEYRING=
-
 	local ARCH_ARCH=${TARGET_ARCH}
 	ARCH_ARCH=${ARCH_ARCH/x64/x86_64}
 	ARCH_ARCH=${ARCH_ARCH/armhf/armv7h}
@@ -549,6 +523,33 @@ fn_make_arch() {
 		PACMAN_EXTRA_PKGS=""
 		ARCH_KEYRING="archlinux"
 	fi
+
+	fn_make_arch_common "${ARCH_ARCH}" "${PACMAN_MIRROR}" "${PACMAN_MIRRORLIST}" "${PACMAN_EXTRA_PKGS}" "${ARCH_KEYRING}"
+}
+
+fn_make_arch_common() {
+	if [ ! -e /usr/bin/arch-chroot ]; then
+		apk add arch-install-scripts
+	fi
+
+	echo "Bootstrap"
+
+	local ARCH_ARCH="${1}"
+	local PACMAN_MIRROR="${2}"
+	local PACMAN_MIRRORLIST="${3}"
+	local PACMAN_EXTRA_PKGS="${4}"
+	local ARCH_KEYRING="${5}"
+
+	#local PACMAN_BASE_PKGS=(bash bzip2 coreutils diffutils filesystem findutils gettext glibc grep gzip less pacman perl procps-ng sed shadow systemd)
+	local PACMAN_BASE_PKGS="bash coreutils diffutils filesystem findutils gawk gettext glibc grep gzip less pacman procps-ng sed systemd haveged"
+	#local PACMAN_REMOVE_PKGS="diffutils gettext gzip less procps-ng haveged"
+	local PACMAN_REMOVE_PKGS="gawk gzip less procps-ng haveged"
+
+	local ALPINE_ARCH=${TARGET_ARCH}
+	ALPINE_ARCH=${ALPINE_ARCH/x64/x86_64}
+	ALPINE_ARCH=${ALPINE_ARCH/armv7h/armv7}
+	ALPINE_ARCH=${ALPINE_ARCH/armhf/armv7}
+	ALPINE_ARCH=${ALPINE_ARCH/aarch64/aarch64}
 
 	PACMAN_CONF="${TARGET_OUTPUT}/pacman.conf"
 
@@ -589,13 +590,11 @@ fn_make_arch() {
 		mkdir -p ${TARGET_OUTPUT}/usr/bin
 		cp extras/${TARGET_QEMU} ${TARGET_OUTPUT}/usr/bin/
 		chroot_cmd() {
-			#QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve "${@}"
-			QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve "${@}"
+			QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve "${@}"
 		}
 	else
 		chroot_cmd() {
-			#PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" "${@}"
-			PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" chroot "${TARGET_OUTPUT}" "${@}"
+			PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" "${@}"
 		}
 	fi
 
@@ -609,29 +608,12 @@ fn_make_arch() {
 	mknod -m 0666 "${TARGET_OUTPUT}/dev/random" c 1 8
 	mknod -m 0666 "${TARGET_OUTPUT}/dev/urandom" c 1 9
 
-	#if [ ! -z "${TARGET_QEMU}" ]; then
-	#	pacstrap -C ${PACMAN_CONF} -c -d -G -M "${TARGET_OUTPUT}" filesystem pacman shadow grep haveged procps-ng
-
-	#	chroot_cmd /bin/sh -c "/usr/bin/haveged ; /usr/bin/rm -fr /etc/pacman.d/gnupg ; /usr/bin/pacman-key --init ; /usr/bin/pacman-key --populate ${ARCH_KEYRING} ; /usr/bin/pkill haveged ; /usr/bin/pkill gpg-agent"
-	#	chroot_cmd /bin/sh -c "/usr/bin/pacman -Suy --noconfirm ${PACMAN_BASE_PKGS} ${PACMAN_EXTRA_PKGS}"
-	#else
-	#	pacstrap -C ${PACMAN_CONF} -c -d -G -M "${TARGET_OUTPUT}" filesystem pacman shadow grep
-
-	#	pacstrap -C ${PACMAN_CONF} -c -d -G -M "${TARGET_OUTPUT}" ${PACMAN_BASE_PKGS} ${PACMAN_EXTRA_PKGS}
-	#fi
-
 	extras/arch-bootstrap.sh -a ${ARCH_ARCH} -r "${PACMAN_MIRROR}" ${TARGET_OUTPUT}
 
-	find ${TARGET_OUTPUT} -name \*.pacnew -exec rm -rf {} \;
-
-	rm -rf ${TARGET_OUTPUT}/.BUILDINFO ${TARGET_OUTPUT}/.INSTALL ${TARGET_OUTPUT}/.MTREE ${TARGET_OUTPUT}/.PKGINFO
 	if [ ! -e ${TARGET_OUTPUT}/pacman.conf ]; then
 		cp ${PACMAN_CONF} ${TARGET_OUTPUT}/
 	fi
-	#chroot_cmd /bin/sh -c "/usr/bin/pacman -Suy --noconfirm --overwrite \"*\" ${PACMAN_BASE_PKGS} ${PACMAN_EXTRA_PKGS}"
 	chroot_cmd /usr/bin/pacman -Suy --noconfirm --overwrite "*" ${PACMAN_BASE_PKGS} ${PACMAN_EXTRA_PKGS}
-	#chroot_cmd /bin/sh -c "/usr/bin/haveged ; /usr/bin/rm -fr /etc/pacman.d/gnupg ; /usr/bin/pacman-key --init ; /usr/bin/pacman-key --populate ${ARCH_KEYRING} ; /usr/bin/pkill haveged ; /usr/bin/pkill gpg-agent"
-	chroot_cmd /usr/bin/haveged ; /usr/bin/rm -fr /etc/pacman.d/gnupg ; /usr/bin/pacman-key --init ; /usr/bin/pacman-key --populate ${ARCH_KEYRING} ; /usr/bin/pkill haveged ; /usr/bin/pkill gpg-agent
 
 	echo
 
@@ -640,33 +622,32 @@ fn_make_arch() {
 	#users gid
 	sed -i -e "s/^users:x:.*$/users:x:100:/g" ${TARGET_OUTPUT}/etc/group
 
-
 	#resolve
 	cat <<- EOF > ${TARGET_OUTPUT}/etc/resolv.conf
 	nameserver 1.1.1.1
 	nameserver 1.0.0.1
 	EOF
 
+	chroot_cmd passwd -d root
+
 	#systemd-sysusers
 	if [ -e "${TARGET_OUTPUT}/usr/bin/systemd-sysusers" ]; then
-		#chroot_cmd /bin/sh -c "/usr/bin/systemd-sysusers"
 		chroot_cmd /usr/bin/systemd-sysusers
 	fi
 
-	chroot_cmd passwd -d root
-
 	#update-ca-trust
-	#chroot_cmd /bin/sh -c "update-ca-trust"
 	chroot_cmd update-ca-trust
 
 	#keyring
-	#chroot_cmd /bin/sh -c "/usr/bin/haveged ; /usr/bin/rm -fr /etc/pacman.d/gnupg ; /usr/bin/pacman-key --init ; /usr/bin/pacman-key --populate ${ARCH_KEYRING} ; /usr/bin/pkill haveged ; /usr/bin/pkill gpg-agent"
-	chroot_cmd /usr/bin/haveged ; /usr/bin/rm -fr /etc/pacman.d/gnupg ; /usr/bin/pacman-key --init ; /usr/bin/pacman-key --populate ${ARCH_KEYRING} ; /usr/bin/pkill haveged ; /usr/bin/pkill gpg-agent
+	chroot_cmd sh -c "/usr/bin/haveged ; /usr/bin/rm -fr /etc/pacman.d/gnupg ; /usr/bin/pacman-key --init ; /usr/bin/pacman-key --populate ${ARCH_KEYRING} ; /usr/bin/pkill haveged ; /usr/bin/pkill gpg-agent"
 
 	#basic config
 	echo "${PACMAN_MIRRORLIST}" > ${TARGET_OUTPUT}/etc/pacman.d/mirrorlist
 	sed -i -e "s/\(Architecture =\) auto/\1 ${ARCH_ARCH}/g" ${TARGET_OUTPUT}/etc/pacman.conf
 	sed -i -e "s/#\(NoUpgrade   =\)/\1 \/etc\/pacman.d\/mirrorlist/g" ${TARGET_OUTPUT}/etc/pacman.conf
+	if [ "${ARCH_ARCH}" = "x86_64" ]; then
+		sed -i -e "/^#\[multilib\]/{N; s/#\(\[multilib\]\)\n#\(.*\)$/\1\n\2/g}" ${TARGET_OUTPUT}/etc/pacman.conf
+	fi
 
 	#locale
 	#if [ -e ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8.gz ]; then
@@ -676,7 +657,6 @@ fn_make_arch() {
 	sed -i -e "s/#*[ ]*${TARGET_LOCALE}/${TARGET_LOCALE}/g" ${TARGET_OUTPUT}/etc/locale.gen
 	echo "LANG=${TARGET_LOCALE}" >> ${TARGET_OUTPUT}/etc/locale.conf
 	echo "LC_ALL=${TARGET_LOCALE}" >> ${TARGET_OUTPUT}/etc/locale.conf
-	#chroot_cmd /bin/sh -c "locale-gen"
 	chroot_cmd locale-gen
 
 	#timezone
@@ -688,25 +668,34 @@ fn_make_arch() {
 	#skel
 	cp -ar ${TARGET_OUTPUT}/etc/skel/. ${TARGET_OUTPUT}/root/
 
-	##yaourt
-	#if [ -e extras/package-query-*-${ARCH_ARCH}.pkg.tar.xz -a -e extras/yaourt-*-any.pkg.tar.xz ]; then
-	#	cp extras/package-query-*-${ARCH_ARCH}.pkg.tar.xz ${TARGET_OUTPUT}/
-	#	cp extras/yaourt-*-any.pkg.tar.xz ${TARGET_OUTPUT}/
-	#	#chroot_cmd /bin/sh -c "/usr/bin/pacman -Sy --noconfirm ; /usr/bin/pacman -U --noconfirm --asdeps /package-query-*; /usr/bin/pacman -U --noconfirm /yaourt-*-any.pkg.tar.xz"
-	#	chroot_cmd /usr/bin/pacman -Sy --noconfirm ; /usr/bin/pacman -U --noconfirm --asdeps /package-query-*; /usr/bin/pacman -U --noconfirm /yaourt-*-any.pkg.tar.xz
-	#	rm -rf ${TARGET_OUTPUT}/*.pkg.tar.xz
-	#fi
-
 	#makepkg
 	[ -e /usr/bin/makepkg ] && sed -i -e 's/(( EUID == 0 ))/false /g' /usr/bin/makepkg
+
+	#busybox
+	local busybox="https://mirror.xtom.com.hk/alpine/latest-stable/main/${ALPINE_ARCH}/$(wget https://mirror.xtom.com.hk/alpine/latest-stable/main/${ALPINE_ARCH}/ -q -O - | grep busybox-static | sed -e 's/^.*href="\([^"]*\)".*$/\1/g')"
+	mkdir -p ${TARGET_OUTPUT}/usr/local/busybox
+	wget "${busybox}" -q -O - | tar zxf - -C ${TARGET_OUTPUT}/usr/local/busybox/
+	mv ${TARGET_OUTPUT}/usr/local/busybox/bin/busybox.static ${TARGET_OUTPUT}/usr/local/busybox/busybox.static
+	chmod +s ${TARGET_OUTPUT}/usr/local/busybox/busybox.static
+	rm -rf ${TARGET_OUTPUT}/usr/local/busybox/bin ${TARGET_OUTPUT}/usr/local/busybox/.PKGINFO ${TARGET_OUTPUT}/usr/local/busybox/.SIGN.RSA*
+	chroot_cmd /usr/local/busybox/busybox.static --install -s /usr/local/busybox
+	ln -s busybox.static ${TARGET_OUTPUT}/usr/local/busybox/busybox
+	cat << EOF > ${TARGET_OUTPUT}/etc/profile.d/busybox.sh
+#!/bin/sh
+
+export PATH=\${PATH}:/usr/local/busybox
+EOF
 
 	echo
 
 
 	echo "Clearing"
-	rm -rf "${TARGET_OUTPUT}/pacman.conf"
+	rm -rf ${TARGET_OUTPUT}/.BUILDINFO ${TARGET_OUTPUT}/.MTREE ${TARGET_OUTPUT}/.PKGINFO
+	rm -rf ${TARGET_OUTPUT}/pacman.conf
+	find ${TARGET_OUTPUT}/etc -name \*.pacnew -exec rm -rf {} \;
+
+	rm -rf ${TARGET_OUTPUT}/.BUILDINFO ${TARGET_OUTPUT}/.INSTALL ${TARGET_OUTPUT}/.MTREE ${TARGET_OUTPUT}/.PKGINFO
 	if [ ! -z "${PACMAN_REMOVE_PKGS}" ]; then
-		#chroot_cmd /bin/sh -c "/usr/bin/pacman -Rsn --noconfirm ${PACMAN_REMOVE_PKGS}"
 		chroot_cmd /usr/bin/pacman -Rsn --noconfirm ${PACMAN_REMOVE_PKGS}
 	fi
 	echo
@@ -1183,9 +1172,9 @@ EOF
 			PATH_CHROOT=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 		fi
 
-		if [ "${TARGET_DISTRO}" = "debian" -o "${TARGET_DISTRO}" = "ubuntu" ]; then
+		if [ "${TARGET_DISTRO}" = "debian" -o "${TARGET_DISTRO}" = "ubuntu" -o "${TARGET_DISTRO}" = "entware" ]; then
 			if [ ! -z "${TARGET_QEMU}" ]; then
-				QEMU_EXECVE=1 PATH="${PATH_CHROOT}" LANG=C LC_ALL=C ${CHROOT_CMD} "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "docker-install -r -u -c"
+				QEMU_EXECVE=1 PATH="${PATH_CHROOT}" LANG=C LC_ALL=C ${CHROOT_CMD} "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "docker-install -r -u -f -c"
 			else
 				PATH="${PATH_CHROOT}" LANG=C LC_ALL=C ${CHROOT_CMD} "${TARGET_OUTPUT}" /bin/sh -c "docker-install -r -u -f -c"
 			fi
@@ -1193,7 +1182,7 @@ EOF
 			if [ ! -z "${TARGET_QEMU}" ]; then
 				QEMU_EXECVE=1 PATH="${PATH_CHROOT}" LANG=C LC_ALL=C ${CHROOT_CMD} "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "docker-install -r -u -c"
 			else
-				PATH="${PATH_CHROOT}" LANG=C LC_ALL=C ${CHROOT_CMD} "${TARGET_OUTPUT}" /bin/sh -c "docker-install -r -u -f -c"
+				PATH="${PATH_CHROOT}" LANG=C LC_ALL=C ${CHROOT_CMD} "${TARGET_OUTPUT}" /bin/sh -c "docker-install -r -u -c"
 			fi
 		fi
 
@@ -1554,7 +1543,7 @@ fi
 fn_target_unmount
 
 #Check arch linux
-if [ "${TARGET_DISTRO}" = "arch" -a "${TARGET_MAKE}" != "Y" ]; then
+if [ "${TARGET_DISTRO}" = "arch" ] && [ "${TARGET_MAKE}" != "Y" ]; then
 	if [ -z "$(ls ${TARGET_OUTPUT}/etc/ca-certificates/extracted)" ]; then
 		TARGET_MAKE=Y
 	fi

@@ -24,4 +24,4 @@ docker run -i -t --rm --sig-proxy=false \
 	-v `pwd`/extras/qemu-aarch64-static:/usr/bin/qemu-aarch64-static \
 	-h alpine-x64-dev-docker \
 	--name alpine-x64-dev-docker-${RANDOM} \
-	forumi0721alpinex64/alpine-x64-dev:latest
+	forumi0721/alpine-dev:latest
