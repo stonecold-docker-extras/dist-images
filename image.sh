@@ -138,7 +138,7 @@ fn_make_busybox() {
 	EOF
 
 	cat <<- EOF > ${TARGET_OUTPUT}/etc/passwd
-	root::0:0:Root:/root:/bin/sh
+	root:x:0:0:Root:/root:/bin/sh
 	nobody:x:65534:65534:nobody:/:/sbin/nologin
 	EOF
 	cat <<- EOF > ${TARGET_OUTPUT}/etc/group
@@ -417,7 +417,7 @@ fn_make_entware() {
 	mv ${TARGET_OUTPUT}/opt/etc/shells.1 ${TARGET_OUTPUT}/opt/etc/shells
 	rm -rf ${TARGET_OUTPUT}/opt/etc/*.1
 	cat <<- EOF > ${TARGET_OUTPUT}/opt/etc/passwd
-	root::0:0:Root:/root:/opt/bin/sh
+	root:x:0:0:Root:/root:/opt/bin/sh
 	nobody:x:65534:65534:nobody:/:/sbin/nologin
 	EOF
 	cat <<- EOF > ${TARGET_OUTPUT}/opt/etc/group
