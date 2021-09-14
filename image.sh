@@ -226,7 +226,7 @@ fn_make_alpine() {
 	local APK_VERSION="$(wget -q -O - ${ALPINE_MIRROR}/latest-stable/main/${ALPINE_ARCH}/APKINDEX.tar.gz | tar -Oxz | grep --text '^P:apk-tools-static$' -A1 | tail -n1 | cut -d: -f2)"
 	wget ${ALPINE_MIRROR}/latest-stable/main/${ALPINE_ARCH}/apk-tools-static-${APK_VERSION}.apk -q -O - | tar -xz -C "${TARGET_OUTPUT}" sbin/apk.static  2>/dev/null
 
-	run_cmd ${TARGET_OUTPUT}/sbin/apk.static --repository ${ALPINE_MIRROR}/latest-stable/main --no-cache --no-script --allow-untrusted --root "${TARGET_OUTPUT}" --initdb add busybox alpine-baselayout alpine-keys apk-tools libc-utils
+	run_cmd ${TARGET_OUTPUT}/sbin/apk.static --repository ${ALPINE_MIRROR}/latest-stable/main --no-cache --no-script --allow-untrusted --root "${TARGET_OUTPUT}" --initdb add busybox alpine-baselayout alpine-keys apk-tools libc-utils ssl_client
 	#for link in $(run_cmd "${TARGET_OUTPUT}"/bin/busybox --list-full); do
 	#	[ -e "${TARGET_OUTPUT}"/$link ] || ln -s /bin/busybox "${TARGET_OUTPUT}"/${link}
 	#done
@@ -299,8 +299,6 @@ fn_make_alpine() {
 		fi
 		rm -rf ${TARGET_OUTPUT}/tmp/tzdata
 	fi
-
-	run_cmd ${TARGET_OUTPUT}/sbin/apk.static --repository ${ALPINE_MIRROR}/latest-stable/main --no-cache --allow-untrusted --root "${TARGET_OUTPUT}" ssl_client
 
 	echo
 
