@@ -300,6 +300,8 @@ fn_make_alpine() {
 		rm -rf ${TARGET_OUTPUT}/tmp/tzdata
 	fi
 
+	run_cmd ${TARGET_OUTPUT}/sbin/apk.static --repository ${ALPINE_MIRROR}/latest-stable/main --no-cache --allow-untrusted --root "${TARGET_OUTPUT}" ssl_client
+
 	echo
 
 
