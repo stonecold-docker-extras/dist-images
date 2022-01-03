@@ -1554,7 +1554,6 @@ fi
 #Make
 if [ "${TARGET_MAKE}" = "Y" ]; then
 	if [ -e /.dockerenv -a -e /etc/alpine-release ] || [ ! -z "${BUILDPLATFORM}" -a ! -z "${TARGETPLATFORM}" ]; then
-		; then
 		rm -rf "${TARGET_OUTPUT}" || (echo "Cannot remove ${TARGET_OUTPUT}" ; exit 1)
 		mkdir -p "${TARGET_OUTPUT}" || (echo "Cannot create ${TARGET_OUTPUT}" ; exit 1)
 		chmod 755 ${TARGET_OUTPUT}
