@@ -1300,6 +1300,8 @@ fi
 
 if [ -e /.dockerenv -a -e "${DOCKER_WORKDIR}" ]; then
 	cd "${DOCKER_WORKDIR}"
+elif [ ! -z "${BUILDPLATFORM}" -a ! -z "${TARGETPLATFORM}" ] && [ -e "${DOCKER_WORKDIR}" ]; then
+	cd "${DOCKER_WORKDIR}"
 fi
 
 DEBUG=N
@@ -1551,14 +1553,15 @@ fi
 
 #Make
 if [ "${TARGET_MAKE}" = "Y" ]; then
-	if [ -e /.dockerenv -a -e /etc/alpine-release ]; then
+	if [ -e /.dockerenv -a -e /etc/alpine-release ] || [ ! -z "${BUILDPLATFORM}" -a ! -z "${TARGETPLATFORM}" ]; then
+		; then
 		rm -rf "${TARGET_OUTPUT}" || (echo "Cannot remove ${TARGET_OUTPUT}" ; exit 1)
 		mkdir -p "${TARGET_OUTPUT}" || (echo "Cannot create ${TARGET_OUTPUT}" ; exit 1)
 		chmod 755 ${TARGET_OUTPUT}
 
 		eval fn_make_${TARGET_DISTRO}
 	else
-		if [ -e /.dockerenv ]; then
+		if [ -e /.dockerenv ] || [ ! -z "${BUILDPLATFORM}" -a ! -z "${TARGETPLATFORM}" ]; then
 			echo "Cannot execute in docker (2)"
 			exit 1
 		else
@@ -1571,10 +1574,10 @@ fi
 
 #Update
 if [ "${TARGET_UPDATE}" = "Y" ]; then
-	if [ -e /.dockerenv -a -e /etc/alpine-release ]; then
+	if [ -e /.dockerenv -a -e /etc/alpine-release ] || [ ! -z "${BUILDPLATFORM}" -a ! -z "${TARGETPLATFORM}" ]; then
 		eval fn_update
 	else
-		if [ -e /.dockerenv ]; then
+		if [ -e /.dockerenv ] || [ ! -z "${BUILDPLATFORM}" -a ! -z "${TARGETPLATFORM}" ]; then
 			echo "Cannot execute in docker (3)"
 			exit 1
 		else
@@ -1588,7 +1591,7 @@ fi
 rm -rf ${TARGET_OUTPUT}/qemu_*.core
 
 #dockerenv
-if [ -e /.dockerenv ]; then
+if [ -e /.dockerenv ] || [ ! -z "${BUILDPLATFORM}" -a ! -z "${TARGETPLATFORM}" ]; then
 	if [ "${TARGET_MAKE}" != "Y" -a "${TARGET_UPDATE}" != "Y" ]; then
 		echo "Cannot exeucte in docker (4)"
 	fi
@@ -1598,10 +1601,13 @@ fi
 #Import
 if [ ! -e /.dockerenv -a "${TARGET_IMPORT}" = "Y" ]; then
 	fn_import
+elif [ -z "${BUILDPLATFORM}" -o -z "${TARGETPLATFORM}" ] && [ "${TARGET_IMPORT}" = "Y" ]; then
 fi
 
 #Push
 if [ ! -e /.dockerenv -a "${TARGET_PUSH}" = "Y" ]; then
+	fn_push
+elif [ -z "${BUILDPLATFORM}" -o -z "${TARGETPLATFORM}" ] && [ "${TARGET_PUSH}" = "Y" ]; then
 	fn_push
 fi
 
