@@ -180,6 +180,7 @@ fn_make_busybox() {
 
 	chroot_cmd /bin/busybox.static sh -c "/bin/busybox.static --install -s ; /bin/busybox.static add-shell /bin/sh"
 
+	ln -s busybox.static ${TARGET_OUTPUT}/bin/busybox
 
 	echo "Clearing"
 
