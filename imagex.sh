@@ -782,7 +782,7 @@ fn_make_ubuntu() {
 		#DEBIAN_DIST="${DEBIAN_DIST:-eoan}"
 		#DEBIAN_DIST="${DEBIAN_DIST:-focal}"
 		#DEBIAN_DIST="${DEBIAN_DIST:-groovy}"
-		DEBIAN_DIST="${DEBIAN_DIST:-hirsute}"
+		DEBIAN_DIST="${DEBIAN_DIST:-impish}"
 	fi
 	echo "Current version : ${DEBIAN_DIST}"
 
