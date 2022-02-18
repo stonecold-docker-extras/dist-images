@@ -1537,7 +1537,7 @@ if [ "${DEBUG}" = "Y" -o "${VERBOSE}" = "Y" ]; then
 fi
 
 if [ -e /sbin/apk ]; then
-	apk add util-linux
+	apk add util-linux losetup
 fi
 
 #prepare
