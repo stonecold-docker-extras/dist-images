@@ -1068,7 +1068,7 @@ EOF
 	cp extras/docker-run ${TARGET_OUTPUT}/usr/local/bin/docker-run
 
 	#docker-install
-	if [ -e "${TARGET_OUTPUT}/etc/alpine-release" ]; then
+	if [ -e "${TARGET_OUTPUT}/etc/apk/world" ]; then
 		cp -f extras/docker-install.alpine ${TARGET_OUTPUT}/usr/local/bin/docker-install
 	elif [ -e "${TARGET_OUTPUT}/opt/bin/opkg" ]; then
 		cp -f extras/docker-install.entware ${TARGET_OUTPUT}/usr/local/bin/docker-install
@@ -1151,7 +1151,7 @@ EOF
 	PATH_CHROOT=
 	CHROOT_CMD=chroot
 	if [ "${TARGET_UPDATE}" = "Y" ]; then
-		if [ -e "${TARGET_OUTPUT}/etc/alpine-release" ]; then
+		if [ -e "${TARGET_OUTPUT}/etc/apk/world" ]; then
 			prev_md5=$(md5sum ${TARGET_OUTPUT}/lib/apk/db/installed | cut -f 1 -d ' ')
 			PATH_CHROOT=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 		elif [ -e "${TARGET_OUTPUT}/opt/bin/opkg" ]; then
@@ -1196,7 +1196,7 @@ EOF
 		fi
 
 		#alpinelinux update baselayout
-		if [ -e "${TARGET_OUTPUT}/etc/alpine-release" ]; then
+		if [ -e "${TARGET_OUTPUT}/etc/apk/world" ]; then
 			if [ ! -z "${TARGET_QEMU}" ]; then
 				QEMU_EXECVE=1 PATH="${PATH_CHROOT}" LANG=C LC_ALL=C ${CHROOT_CMD} "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "apk --no-cache --allow-untrusted --quiet fetch alpine-base ; cat /alpine-base*.apk | tar -zxf - -C / etc/ ; rm -rf /alpine-base*.apk"
 			else
@@ -1204,7 +1204,7 @@ EOF
 			fi
 		fi
 
-		if [ -e "${TARGET_OUTPUT}/etc/alpine-release" ]; then
+		if [ -e "${TARGET_OUTPUT}/etc/apk/world" ]; then
 			post_md5=$(md5sum ${TARGET_OUTPUT}/lib/apk/db/installed | cut -f 1 -d ' ')
 		elif [ -e "${TARGET_OUTPUT}/opt/bin/opkg" ]; then
 			post_md5=$(md5sum ${TARGET_OUTPUT}/opt/lib/opkg/status | cut -f 1 -d ' ')
@@ -1553,7 +1553,7 @@ fi
 
 #Make
 if [ "${TARGET_MAKE}" = "Y" ]; then
-	if [ -e /.dockerenv -a -e /etc/alpine-release ] || [ ! -z "${BUILDPLATFORM}" -a ! -z "${TARGETPLATFORM}" ]; then
+	if [ -e /.dockerenv -a -e /etc/apk/world ] || [ ! -z "${BUILDPLATFORM}" -a ! -z "${TARGETPLATFORM}" ]; then
 		rm -rf "${TARGET_OUTPUT}" || (echo "Cannot remove ${TARGET_OUTPUT}" ; exit 1)
 		mkdir -p "${TARGET_OUTPUT}" || (echo "Cannot create ${TARGET_OUTPUT}" ; exit 1)
 		chmod 755 ${TARGET_OUTPUT}
@@ -1575,7 +1575,7 @@ fi
 
 #Update
 if [ "${TARGET_UPDATE}" = "Y" ]; then
-	if [ -e /.dockerenv -a -e /etc/alpine-release ] || [ ! -z "${BUILDPLATFORM}" -a ! -z "${TARGETPLATFORM}" ]; then
+	if [ -e /.dockerenv -a -e /etc/apk/world ] || [ ! -z "${BUILDPLATFORM}" -a ! -z "${TARGETPLATFORM}" ]; then
 		eval fn_update
 	else
 		if [ -e /.dockerenv ] || [ ! -z "${BUILDPLATFORM}" -a ! -z "${TARGETPLATFORM}" ]; then
