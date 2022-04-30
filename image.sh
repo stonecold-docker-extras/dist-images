@@ -1561,6 +1561,8 @@ if [ "${TARGET_MAKE}" = "Y" ]; then
 		eval fn_make_${TARGET_DISTRO}
 	else
 		if [ -e /.dockerenv ] || [ ! -z "${BUILDPLATFORM}" -a ! -z "${TARGETPLATFORM}" ]; then
+			echo "BUILDPLATFORM : ${BUILDPLATFORM}"
+			echo "TARGETPLATFORM : ${TARGETPLATFORM}"
 			echo "Cannot execute in docker (2)"
 			exit 1
 		else
