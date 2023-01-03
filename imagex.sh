@@ -557,13 +557,15 @@ fn_make_arch() {
 	if [ "${ARCH_ARCH}" = "x86_64" ]; then
 		#PACMAN_MIRROR=http://ftp.lanet.kr/pub/archlinux
 		#PACMAN_MIRROR=http://ftp.harukasan.org/archlinux
-		PACMAN_MIRROR=http://mirror.anigil.com/archlinux
+		#PACMAN_MIRROR=http://mirror.anigil.com/archlinux
+		PACMAN_MIRROR=http://mirror.premi.st/archlinux
 		PACMAN_MIRRORLIST="Server = ${PACMAN_MIRROR}/\$repo/os/\$arch"
 		PACMAN_EXTRA_PKGS=""
 		ARCH_KEYRING="archlinux"
 	else
 		#PACMAN_MIRROR=http://ca.us.mirror.archlinuxarm.org
-		PACMAN_MIRROR=http://tw.mirror.archlinuxarm.org
+		#PACMAN_MIRROR=http://tw.mirror.archlinuxarm.org
+		PACMAN_MIRROR=http://mirror.premi.st/archlinux-arm
 		PACMAN_MIRRORLIST="Server = ${PACMAN_MIRROR}/\$arch/\$repo"
 		PACMAN_EXTRA_PKGS="archlinuxarm-keyring"
 		ARCH_KEYRING="archlinuxarm"
