@@ -839,7 +839,7 @@ fn_make_debian_common() {
 	fi
 	DEBIAN_OPTION=("${DEBIAN_OPTION[@]}" "--components=${DEBIAN_COMPONENTS// /,}")
 	DEBIAN_OPTION=("${DEBIAN_OPTION[@]}" "--merged-usr")
-	DEBIAN_OPTION=("--arch=${DEBIAN_ARCH}" "${DEBIAN_OPTION[@]}" "--exclude=base-files,bsdutils,e2fslibs,e2fsprogs,gzip,libcomerr2,lsb-base,mount,sed,sysvinit-utils,systemd")
+	DEBIAN_OPTION=("--arch=${DEBIAN_ARCH}" "${DEBIAN_OPTION[@]}" "--exclude=bsdutils,e2fslibs,e2fsprogs,gzip,libcomerr2,lsb-base,mount,sed,sysvinit-utils,systemd")
 
 	#Copy qemu
 	if [ ! -z "${TARGET_QEMU}" ]; then
