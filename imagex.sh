@@ -753,7 +753,7 @@ fn_make_debian() {
 	if [ -z "${DEBIAN_DIST}" ]; then
 		#DEBIAN_DIST="$(curl -sSL http://ftp.kaist.ac.kr/debian/dists/README | grep '^stable,' | sed -e 's/^stable, or \([^ ]\+\)\s\+.*$/\1/g')"
 		#DEBIAN_DIST="${DEBIAN_DIST:-sid}"
-		DEBIAN_DIST="${DEBIAN_DIST:-testing}"
+		DEBIAN_DIST="${DEBIAN_DIST:-stable}"
 	fi
 	echo "Current version : ${DEBIAN_DIST}"
 
