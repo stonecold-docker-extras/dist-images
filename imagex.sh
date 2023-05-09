@@ -908,8 +908,8 @@ fn_make_debian_common() {
 		#deb ${DEBIAN_MIRROR} ${DEBIAN_DIST}-backports ${DEBIAN_COMPONENTS}
 		## deb-src ${DEBIAN_MIRROR} ${DEBIAN_DIST}-backports ${DEBIAN_COMPONENTS}
 
-		$([ "${DEBIAN_DIST}" = "sid" -o "${DEBIAN_DIST}" = "testing" ] && echo "#")deb http://security.debian.org ${DEBIAN_DIST}/updates ${DEBIAN_COMPONENTS}
-		$([ "${DEBIAN_DIST}" = "sid" -o "${DEBIAN_DIST}" = "testing" ] && echo "#")# deb-src http://security.debian.org ${DEBIAN_DIST}/updates ${DEBIAN_COMPONENTS}
+		$([ "${DEBIAN_DIST}" = "sid" -o "${DEBIAN_DIST}" = "testing" ] && echo "#")deb http://security.debian.org/debian-security ${DEBIAN_DIST}-security ${DEBIAN_COMPONENTS}
+		$([ "${DEBIAN_DIST}" = "sid" -o "${DEBIAN_DIST}" = "testing" ] && echo "#")# deb-src http://security.debian.org/debian-security ${DEBIAN_DIST}-security ${DEBIAN_COMPONENTS}
 
 		EOF
 		if [ "${DEBIAN_DIST}" = "sid" -o "${DEBIAN_DIST}" = "testing" ] ; then
