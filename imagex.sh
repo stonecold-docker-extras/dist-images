@@ -96,7 +96,8 @@ fn_make_busybox() {
 	ALPINE_ARCH=${ALPINE_ARCH/aarch64/aarch64}
 	ALPINE_ARCH=${ALPINE_ARCH/armv7/armv7}
 
-	local busybox="https://mirror.xtom.com.hk/alpine/latest-stable/main/${ALPINE_ARCH}/$(wget https://mirror.xtom.com.hk/alpine/latest-stable/main/${ALPINE_ARCH}/ -q -O - | grep busybox-static | sed -e 's/^.*href="\([^"]*\)".*$/\1/g')"
+	#busybox
+	local busybox="https://mirror.xtom.com.hk/alpine/latest-stable/main/${ALPINE_ARCH}/$(wget https://mirror.xtom.com.hk/alpine/latest-stable/main/${ALPINE_ARCH}/ -q -O - | grep busybox-static | sed -e 's/^.*href="\([^"]*\)".*$/\1/g' | sort -V | tail -1)"
 	wget "${busybox}" -q -O - | tar zxf - -C ${TARGET_OUTPUT}/
 	rm -rf ${TARGET_OUTPUT}/.PKGINFO ${TARGET_OUTPUT}/.SIGN.RSA*
 
@@ -364,7 +365,7 @@ fn_make_entware() {
 	fi
 
 	#busybox
-	local busybox="https://mirror.xtom.com.hk/alpine/latest-stable/main/${ALPINE_ARCH}/$(wget https://mirror.xtom.com.hk/alpine/latest-stable/main/${ALPINE_ARCH}/ -q -O - | grep busybox-static | sed -e 's/^.*href="\([^"]*\)".*$/\1/g')"
+	local busybox="https://mirror.xtom.com.hk/alpine/latest-stable/main/${ALPINE_ARCH}/$(wget https://mirror.xtom.com.hk/alpine/latest-stable/main/${ALPINE_ARCH}/ -q -O - | grep busybox-static | sed -e 's/^.*href="\([^"]*\)".*$/\1/g' | sort -V | tail -1)"
 	wget "${busybox}" -q -O - | tar zxf - -C ${TARGET_OUTPUT}/
 	rm -rf ${TARGET_OUTPUT}/.PKGINFO ${TARGET_OUTPUT}/.SIGN.RSA*
 	mv ${TARGET_OUTPUT}/bin ${TARGET_OUTPUT}/bbin
@@ -714,7 +715,7 @@ fn_make_arch_common() {
 	[ -e /usr/bin/makepkg ] && sed -i -e 's/(( EUID == 0 ))/false /g' /usr/bin/makepkg
 
 	#busybox
-	local busybox="https://mirror.xtom.com.hk/alpine/latest-stable/main/${ALPINE_ARCH}/$(wget https://mirror.xtom.com.hk/alpine/latest-stable/main/${ALPINE_ARCH}/ -q -O - | grep busybox-static | sed -e 's/^.*href="\([^"]*\)".*$/\1/g')"
+	local busybox="https://mirror.xtom.com.hk/alpine/latest-stable/main/${ALPINE_ARCH}/$(wget https://mirror.xtom.com.hk/alpine/latest-stable/main/${ALPINE_ARCH}/ -q -O - | grep busybox-static | sed -e 's/^.*href="\([^"]*\)".*$/\1/g' | sort -V | tail -1)"
 	mkdir -p ${TARGET_OUTPUT}/usr/local/busybox
 	wget "${busybox}" -q -O - | tar zxf - -C ${TARGET_OUTPUT}/usr/local/busybox/
 	mv ${TARGET_OUTPUT}/usr/local/busybox/bin/busybox.static ${TARGET_OUTPUT}/usr/local/busybox/busybox.static
