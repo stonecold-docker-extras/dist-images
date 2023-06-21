@@ -233,16 +233,16 @@ fn_make_alpine() {
 	local APK_VERSION="$(wget -q -O - ${ALPINE_MIRROR}/latest-stable/main/${ALPINE_ARCH}/APKINDEX.tar.gz | tar -Oxz | grep --text '^P:apk-tools-static$' -A1 | tail -n1 | cut -d: -f2)"
 	wget ${ALPINE_MIRROR}/latest-stable/main/${ALPINE_ARCH}/apk-tools-static-${APK_VERSION}.apk -q -O - | tar -xz -C "${TARGET_OUTPUT}" sbin/apk.static  2>/dev/null
 
-	run_cmd ${TARGET_OUTPUT}/sbin/apk.static --repository ${ALPINE_MIRROR}/latest-stable/main --no-cache --no-script --allow-untrusted --root "${TARGET_OUTPUT}" --initdb add busybox alpine-baselayout alpine-keys apk-tools libc-utils
+	run_cmd ${TARGET_OUTPUT}/sbin/apk.static --repository ${ALPINE_MIRROR}/latest-stable/main --no-cache --no-script --allow-untrusted --root "${TARGET_OUTPUT}" --initdb add busybox alpine-baselayout alpine-keys apk-tools libc-utils alpine-release
 	#for link in $(run_cmd "${TARGET_OUTPUT}"/bin/busybox --list-full); do
 	#	[ -e "${TARGET_OUTPUT}"/$link ] || ln -s /bin/busybox "${TARGET_OUTPUT}"/${link}
 	#done
 	chroot_cmd /bin/busybox --install -s
-	if [ "${ALPINE_DIST}" = "edge" ]; then
-		run_cmd ${TARGET_OUTPUT}/sbin/apk.static --repository ${ALPINE_MIRROR}/edge/tesing --repository ${ALPINE_MIRROR}/edge/main --repository ${ALPINE_MIRROR}/edge/community --no-cache --allow-untrusted --root "${TARGET_OUTPUT}" --stdout --quiet fetch alpine-base | tar -zx -C "${TARGET_OUTPUT}" etc/
-	else
-		run_cmd ${TARGET_OUTPUT}/sbin/apk.static --repository ${ALPINE_MIRROR}/${ALPINE_DIST}/main --repository ${ALPINE_MIRROR}/${ALPINE_DIST}/community --no-cache --allow-untrusted --root "${TARGET_OUTPUT}" --stdout --quiet fetch alpine-base | tar -zx -C "${TARGET_OUTPUT}" etc/
-	fi
+	#if [ "${ALPINE_DIST}" = "edge" ]; then
+	#	run_cmd ${TARGET_OUTPUT}/sbin/apk.static --repository ${ALPINE_MIRROR}/edge/tesing --repository ${ALPINE_MIRROR}/edge/main --repository ${ALPINE_MIRROR}/edge/community --no-cache --allow-untrusted --root "${TARGET_OUTPUT}" --stdout --quiet fetch alpine-base | tar -zx -C "${TARGET_OUTPUT}" etc/
+	#else
+	#	run_cmd ${TARGET_OUTPUT}/sbin/apk.static --repository ${ALPINE_MIRROR}/${ALPINE_DIST}/main --repository ${ALPINE_MIRROR}/${ALPINE_DIST}/community --no-cache --allow-untrusted --root "${TARGET_OUTPUT}" --stdout --quiet fetch alpine-base | tar -zx -C "${TARGET_OUTPUT}" etc/
+	#fi
 
 	echo
 
@@ -1229,14 +1229,14 @@ EOF
 		fi
 
 		#alpinelinux update baselayout
-		if [ -e "${TARGET_OUTPUT}/etc/apk/world" ]; then
-			if [ ! -z "${TARGET_QEMU}" ]; then
-				#QEMU_EXECVE=1 PATH="${PATH_CHROOT}" LANG=C LC_ALL=C ${CHROOT_CMD} "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "apk --no-cache --allow-untrusted --quiet fetch alpine-base ; cat /alpine-base*.apk | tar -zxf - -C / etc/ ; rm -rf /alpine-base*.apk"
-				PATH="${PATH_CHROOT}" LANG=C LC_ALL=C ${CHROOT_CMD} "${TARGET_OUTPUT}" /bin/sh -c "apk --no-cache --allow-untrusted --quiet fetch alpine-base ; cat /alpine-base*.apk | tar -zxf - -C / etc/ ; rm -rf /alpine-base*.apk"
-			else
-				PATH="${PATH_CHROOT}" LANG=C LC_ALL=C ${CHROOT_CMD} "${TARGET_OUTPUT}" /bin/sh -c "apk --no-cache --allow-untrusted --quiet fetch alpine-base ; cat /alpine-base*.apk | tar -zxf - -C / etc/ ; rm -rf /alpine-base*.apk"
-			fi
-		fi
+		#if [ -e "${TARGET_OUTPUT}/etc/apk/world" ]; then
+		#	if [ ! -z "${TARGET_QEMU}" ]; then
+		#		#QEMU_EXECVE=1 PATH="${PATH_CHROOT}" LANG=C LC_ALL=C ${CHROOT_CMD} "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "apk --no-cache --allow-untrusted --quiet fetch alpine-base ; cat /alpine-base*.apk | tar -zxf - -C / etc/ ; rm -rf /alpine-base*.apk"
+		#		PATH="${PATH_CHROOT}" LANG=C LC_ALL=C ${CHROOT_CMD} "${TARGET_OUTPUT}" /bin/sh -c "apk --no-cache --allow-untrusted --quiet fetch alpine-base ; cat /alpine-base*.apk | tar -zxf - -C / etc/ ; rm -rf /alpine-base*.apk"
+		#	else
+		#		PATH="${PATH_CHROOT}" LANG=C LC_ALL=C ${CHROOT_CMD} "${TARGET_OUTPUT}" /bin/sh -c "apk --no-cache --allow-untrusted --quiet fetch alpine-base ; cat /alpine-base*.apk | tar -zxf - -C / etc/ ; rm -rf /alpine-base*.apk"
+		#	fi
+		#fi
 
 		if [ -e "${TARGET_OUTPUT}/etc/apk/world" ]; then
 			post_md5=$(md5sum ${TARGET_OUTPUT}/lib/apk/db/installed | cut -f 1 -d ' ')
