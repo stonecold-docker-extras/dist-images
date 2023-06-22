@@ -763,12 +763,12 @@ fn_make_debian() {
 	DEBIAN_ARCH=${DEBIAN_ARCH/aarch64/arm64}
 	DEBIAN_ARCH=${DEBIAN_ARCH/armv7/armhf}
 
-	#local DEBIAN_MIRROR=http://ftp.kr.debian.org/debian
+	local DEBIAN_MIRROR=http://ftp.kr.debian.org/debian
 	#local DEBIAN_MIRROR=http://ftp.daumkakao.com/debian
 	#local DEBIAN_MIRROR=http://ftp.lanet.kr/pub/debian
 	#local DEBIAN_MIRROR=http://ftp.harukasan.org/debian
 	#local DEBIAN_MIRROR=http://mirror.kakao.com/debian
-	local DEBIAN_MIRROR=http://mirror.anigil.com/debian
+	#local DEBIAN_MIRROR=http://mirror.anigil.com/debian
 
 	local DEBIAN_COMPONENTS="main contrib non-free"
 
@@ -794,17 +794,17 @@ fn_make_ubuntu() {
 
 	local DEBIAN_MIRROR=
 	if [ "${TARGET_ARCH}" = "x64" ]; then
-		#DEBIAN_MIRROR=http://kr.archive.ubuntu.com/ubuntu
+		DEBIAN_MIRROR=http://kr.archive.ubuntu.com/ubuntu
 		#DEBIAN_MIRROR=http://ftp.daumkakao.com/ubuntu
 		#DEBIAN_MIRROR=http://ftp.lanet.kr/pub/ubuntu
 		#DEBIAN_MIRROR=http://ftp.harukasan.org/ubuntu
 		#DEBIAN_MIRROR=http://mirror.kakao.com/ubuntu
-		DEBIAN_MIRROR=http://mirror.anigil.com/ubuntu
+		#DEBIAN_MIRROR=http://mirror.anigil.com/ubuntu
 	else
 		#DEBIAN_MIRROR=https://mirrors.xtom.com.hk/ubuntu-ports
-		#DEBIAN_MIRROR=http://ports.ubuntu.com/ubuntu-ports
+		DEBIAN_MIRROR=http://ports.ubuntu.com/ubuntu-ports
 		#DEBIAN_MIRROR=http://ftp.harukasan.org/ubuntu-ports
-		DEBIAN_MIRROR=http://mirror.anigil.com/ubuntu-ports
+		#DEBIAN_MIRROR=http://mirror.anigil.com/ubuntu-ports
 	fi
 
 	local DEBIAN_COMPONENTS="main universe restricted multiverse"
