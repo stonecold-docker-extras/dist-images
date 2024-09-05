@@ -727,7 +727,7 @@ fn_make_debian() {
 	DEBIAN_ARCH=${DEBIAN_ARCH/armv7h/armhf}
 	DEBIAN_ARCH=${DEBIAN_ARCH/aarch64/arm64}
 
-	local DEBIAN_COMPONENTS="main contrib non-free"
+	local DEBIAN_COMPONENTS="main contrib non-free non-free-firmware"
 
 	fn_make_debian_common "${DEBIAN_DIST}" "${DEBIAN_MIRROR}" "${DEBIAN_EXTRA}" "${DEBIAN_ARCH}" "${DEBIAN_COMPONENTS}"
 }

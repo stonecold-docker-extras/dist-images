@@ -765,7 +765,7 @@ fn_make_debian() {
 	#local DEBIAN_MIRROR=http://mirror.kakao.com/debian
 	#local DEBIAN_MIRROR=http://mirror.anigil.com/debian
 
-	local DEBIAN_COMPONENTS="main contrib non-free"
+	local DEBIAN_COMPONENTS="main contrib non-free non-free-firmware"
 
 	local DEBIAN_EXTRA=""
 	#local DEBIAN_EXTRA=locales
