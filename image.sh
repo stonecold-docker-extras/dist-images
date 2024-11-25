@@ -515,7 +515,7 @@ fn_make_arch() {
 		PACMAN_EXTRA_PKGS="archlinuxarm-keyring"
 		ARCH_KEYRING="archlinuxarm"
 	else
-		PACMAN_MIRROR=http://seoul.mirror.pkgbuild.com
+		PACMAN_MIRROR=https://ftp.lanet.kr/pub/archlinux
 		PACMAN_MIRRORLIST="Server = ${PACMAN_MIRROR}/\$repo/os/\$arch"
 		PACMAN_EXTRA_PKGS=""
 		ARCH_KEYRING="archlinux"

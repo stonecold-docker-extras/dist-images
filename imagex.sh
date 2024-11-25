@@ -556,7 +556,7 @@ fn_make_arch() {
 	ARCH_ARCH=${ARCH_ARCH/armv7/armv7h}
 
 	if [ "${ARCH_ARCH}" = "x86_64" ]; then
-		PACMAN_MIRROR=http://seoul.mirror.pkgbuild.com
+		PACMAN_MIRROR=https://ftp.lanet.kr/pub/archlinux
 		PACMAN_MIRRORLIST="Server = ${PACMAN_MIRROR}/\$repo/os/\$arch"
 		PACMAN_EXTRA_PKGS=""
 		ARCH_KEYRING="archlinux"
