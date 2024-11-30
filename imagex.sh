@@ -556,7 +556,7 @@ fn_make_arch() {
 	ARCH_ARCH=${ARCH_ARCH/armv7/armv7h}
 
 	if [ "${ARCH_ARCH}" = "x86_64" ]; then
-		PACMAN_MIRROR=https://ftp.lanet.kr/pub/archlinux
+		PACMAN_MIRROR=http://ftp.lanet.kr/pub/archlinux
 		PACMAN_MIRRORLIST="Server = ${PACMAN_MIRROR}/\$repo/os/\$arch"
 		PACMAN_EXTRA_PKGS=""
 		ARCH_KEYRING="archlinux"
@@ -573,6 +573,9 @@ fn_make_arch() {
 fn_make_arch_common() {
 	if [ ! -e /usr/bin/arch-chroot ]; then
 		apk add arch-install-scripts
+	fi
+	if [ ! -e /usr/bin/curl ]; then
+		apk add curl
 	fi
 
 	echo "Bootstrap"
@@ -646,7 +649,8 @@ fn_make_arch_common() {
 	mknod -m 0666 "${TARGET_OUTPUT}/dev/random" c 1 8
 	mknod -m 0666 "${TARGET_OUTPUT}/dev/urandom" c 1 9
 
-	extras/arch-bootstrap.sh -a ${ARCH_ARCH} -r "${PACMAN_MIRROR}" ${TARGET_OUTPUT}
+	#extras/arch-bootstrap.sh -a ${ARCH_ARCH} -r "${PACMAN_MIRROR}" ${TARGET_OUTPUT}
+	extras/arch-bootstrap.sh -a ${ARCH_ARCH} ${TARGET_OUTPUT}
 
 	if [ ! -e ${TARGET_OUTPUT}/pacman.conf ]; then
 		cp ${PACMAN_CONF} ${TARGET_OUTPUT}/
@@ -710,7 +714,9 @@ fn_make_arch_common() {
 	[ -e /usr/bin/makepkg ] && sed -i -e 's/(( EUID == 0 ))/false /g' /usr/bin/makepkg
 
 	#busybox
+	set -x
 	local busybox="https://mirror.xtom.com.hk/alpine/latest-stable/main/${ALPINE_ARCH}/$(wget https://mirror.xtom.com.hk/alpine/latest-stable/main/${ALPINE_ARCH}/ -q -O - | grep busybox-static | sed -e 's/^.*href="\([^"]*\)".*$/\1/g' | sort -V | tail -1)"
+	echo ${busybox}
 	mkdir -p ${TARGET_OUTPUT}/usr/local/busybox
 	wget "${busybox}" -q -O - | tar zxf - -C ${TARGET_OUTPUT}/usr/local/busybox/
 	mv ${TARGET_OUTPUT}/usr/local/busybox/bin/busybox.static ${TARGET_OUTPUT}/usr/local/busybox/busybox.static
@@ -723,6 +729,7 @@ fn_make_arch_common() {
 
 export PATH=\${PATH}:/usr/local/busybox
 EOF
+	set +x
 
 	echo
 
