@@ -866,7 +866,13 @@ fn_make_debian_common() {
 	echo ${url} ${DEBIAN_MIRROR}/${url}
 	mkdir ${TARGET_OUTPUT}/busybox
 	wget ${DEBIAN_MIRROR}/${url} -q -O ${TARGET_OUTPUT}/busybox/busybox.deb
-	chroot_cmd /bin/sh -c "dpkg-deb -x /busybox/busybox.deb /busybox ; /busybox/bin/busybox cp /busybox/bin/busybox /bin/ ; /bin/busybox --install -s"
+	chroot_cmd /bin/sh -c "dpkg-deb -x /busybox/busybox.deb /busybox"
+	if [ -e ${TARGET_OUTPUT}/busybox/usr/bin/busybox ]; then
+		cp ${TARGET_OUTPUT}/busybox/usr/bin/busybox ${TARGET_OUTPUT}/bin/
+	else
+		cp ${TARGET_OUTPUT}/busybox/bin/busybox ${TARGET_OUTPUT}/bin/
+	fi
+	chroot_cmd /bin/busybox --install -s
 	rm -rf ${TARGET_OUTPUT}/busybox
 
 	echo "${TARGET_TIMEZONE}" > ${TARGET_OUTPUT}/etc/timezone
