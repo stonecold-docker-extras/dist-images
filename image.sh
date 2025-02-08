@@ -712,12 +712,7 @@ fn_make_debian() {
 	fi
 	echo "Current version : ${DEBIAN_DIST}"
 
-	#local DEBIAN_MIRROR=http://ftp.kr.debian.org/debian
-	#local DEBIAN_MIRROR=http://ftp.daumkakao.com/debian
-	#local DEBIAN_MIRROR=http://ftp.lanet.kr/pub/debian
-	#local DEBIAN_MIRROR=http://ftp.harukasan.org/debian
-	#local DEBIAN_MIRROR=http://mirror.kakao.com/debian
-	local DEBIAN_MIRROR=http://mirror.anigil.com/debian
+	local DEBIAN_MIRROR=http://ftp.kr.debian.org/debian
 
 	local DEBIAN_EXTRA=""
 	#local DEBIAN_EXTRA=locales
@@ -736,10 +731,10 @@ fn_make_ubuntu() {
 	local DEBIAN_DIST=${TARGET_EDITION}
 	if [ -z "${DEBIAN_DIST}" ]; then
 		#DEBIAN_DIST="$(curl -sSL http://ftp.kaist.ac.kr/ubuntu/dists/ | grep -v 'backports' | grep -v 'proposed' | grep -v 'security' | grep -v 'updates' | grep '<tr><td class="n">' | tail -1  | sed -e 's/^<tr><td class="n"><a href="\(.*\)\/">.*$/\1/g')"
-		#DEBIAN_DIST="${DEBIAN_DIST:-eoan}"
+		#DEBIAN_DIST="${DEBIAN_DIST:-bionic}"
 		#DEBIAN_DIST="${DEBIAN_DIST:-focal}"
-		#DEBIAN_DIST="${DEBIAN_DIST:-groovy}"
-		DEBIAN_DIST="${DEBIAN_DIST:-hirsute}"
+		#DEBIAN_DIST="${DEBIAN_DIST:-jammy}"
+		DEBIAN_DIST="${DEBIAN_DIST:-noble}"
 	fi
 	echo "Current version : ${DEBIAN_DIST}"
 
@@ -749,17 +744,11 @@ fn_make_ubuntu() {
 
 	local DEBIAN_MIRROR=
 	if [ ! -z "${TARGET_QEMU}" ]; then
-		#DEBIAN_MIRROR=https://mirrors.xtom.com.hk/ubuntu-ports
 		#DEBIAN_MIRROR=http://ports.ubuntu.com/ubuntu-ports
-		#DEBIAN_MIRROR=http://ftp.harukasan.org/ubuntu-ports
-		DEBIAN_MIRROR=http://mirror.anigil.com/ubuntu-ports
+		DEBIAN_MIRROR=http://ftp.kaist.ac.kr/ubuntu-ports
 	else
 		#DEBIAN_MIRROR=http://kr.archive.ubuntu.com/ubuntu
-		#DEBIAN_MIRROR=http://ftp.daumkakao.com/ubuntu
-		#DEBIAN_MIRROR=http://ftp.lanet.kr/pub/ubuntu
-		#DEBIAN_MIRROR=http://ftp.harukasan.org/ubuntu
-		#DEBIAN_MIRROR=http://mirror.kakao.com/ubuntu
-		DEBIAN_MIRROR=http://mirror.anigil.com/ubuntu
+		DEBIAN_MIRROR=http://ftp.kaist.ac.kr/ubuntu/
 	fi
 
 	local DEBIAN_EXTRA=""
