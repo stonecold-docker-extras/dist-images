@@ -803,6 +803,9 @@ fn_make_ubuntu() {
 	#local DEBIAN_EXTRA="language-pack-ko"
 	#local DEBIAN_EXTRA="locales,tzdata"
 
+	#fix error
+	sed -i -e 's/; && / \&\& /g' /usr/share/debootstrap/scripts/gutsy
+
 	if [ ! -e /usr/share/debootstrap/scripts/${DEBIAN_DIST} -a -e /usr/share/debootstrap/scripts/gutsy ]; then
 		ln -s gutsy /usr/share/debootstrap/scripts/${DEBIAN_DIST}
 	fi
