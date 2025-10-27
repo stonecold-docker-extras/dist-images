@@ -230,6 +230,14 @@ fn_make_alpine() {
 			PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin LANG=C LC_ALL=C chroot "${TARGET_OUTPUT}" "${@}"
 		}
 	fi
+
+	#skel
+	mkdir -p ${TARGET_OUTPUT}/usr/bin ${TARGET_OUTPUT}/usr/sbin ${TARGET_OUTPUT}/usr/lib
+	ln -s usr/bin ${TARGET_OUTPUT}/bin
+	ln -s usr/sbin ${TARGET_OUTPUT}/sbin
+	ln -s usr/lib ${TARGET_OUTPUT}/lib
+
+	#init
 	local APK_VERSION="$(wget -q -O - ${ALPINE_MIRROR}/latest-stable/main/${ALPINE_ARCH}/APKINDEX.tar.gz | tar -Oxz | grep --text '^P:apk-tools-static$' -A1 | tail -n1 | cut -d: -f2)"
 	wget ${ALPINE_MIRROR}/latest-stable/main/${ALPINE_ARCH}/apk-tools-static-${APK_VERSION}.apk -q -O - | tar -xz -C "${TARGET_OUTPUT}" sbin/apk.static  2>/dev/null
 
@@ -237,7 +245,7 @@ fn_make_alpine() {
 	#for link in $(run_cmd "${TARGET_OUTPUT}"/bin/busybox --list-full); do
 	#	[ -e "${TARGET_OUTPUT}"/$link ] || ln -s /bin/busybox "${TARGET_OUTPUT}"/${link}
 	#done
-	chroot_cmd /bin/busybox --install -s
+	chroot_cmd /usr/bin/busybox --install -s
 	#if [ "${ALPINE_DIST}" = "edge" ]; then
 	#	run_cmd ${TARGET_OUTPUT}/sbin/apk.static --repository ${ALPINE_MIRROR}/edge/tesing --repository ${ALPINE_MIRROR}/edge/main --repository ${ALPINE_MIRROR}/edge/community --no-cache --allow-untrusted --root "${TARGET_OUTPUT}" --stdout --quiet fetch alpine-base | tar -zx -C "${TARGET_OUTPUT}" etc/
 	#else
