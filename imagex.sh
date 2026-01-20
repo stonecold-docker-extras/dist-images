@@ -88,6 +88,10 @@ fi
 }
 
 fn_make_busybox() {
+	if [ ! -e /bin/busybox.static ]; then
+		apk add busybox-static
+	fi
+
 	echo "Bootstrap"
 
 	# Need busbox for bootstrapping
@@ -97,9 +101,11 @@ fn_make_busybox() {
 	ALPINE_ARCH=${ALPINE_ARCH/armv7/armv7}
 
 	#busybox
-	local busybox="https://mirror.xtom.com.hk/alpine/latest-stable/main/${ALPINE_ARCH}/$(wget https://mirror.xtom.com.hk/alpine/latest-stable/main/${ALPINE_ARCH}/ -q -O - | grep busybox-static | sed -e 's/^.*href="\([^"]*\)".*$/\1/g' | sort -V | tail -1)"
-	wget "${busybox}" -q -O - | tar zxf - -C ${TARGET_OUTPUT}/
-	rm -rf ${TARGET_OUTPUT}/.PKGINFO ${TARGET_OUTPUT}/.SIGN.RSA*
+	#local busybox="https://mirror.xtom.com.hk/alpine/latest-stable/main/${ALPINE_ARCH}/$(wget https://mirror.xtom.com.hk/alpine/latest-stable/main/${ALPINE_ARCH}/ -q -O - | grep busybox-static | sed -e 's/^.*href="\([^"]*\)".*$/\1/g' | sort -V | tail -1)"
+	#wget "${busybox}" -q -O - | tar zxf - -C ${TARGET_OUTPUT}/
+	#rm -rf ${TARGET_OUTPUT}/.PKGINFO ${TARGET_OUTPUT}/.SIGN.RSA*
+	mkdir -p ${TARGET_OUTPUT}/bin
+	cp /bin/busybox.static ${TARGET_OUTPUT}/bin/
 
 	for x in bin dev etc home lib opt proc root run sbin sys tmp var usr
 	do
@@ -338,6 +344,10 @@ fn_make_alpine() {
 }
 
 fn_make_entware() {
+	if [ ! -e /bin/busybox.static ]; then
+		apk add busybox-static
+	fi
+
 	echo "Bootstrap"
 	local USE_LOCALE=Y
 
@@ -373,10 +383,12 @@ fn_make_entware() {
 	fi
 
 	#busybox
-	local busybox="https://mirror.xtom.com.hk/alpine/latest-stable/main/${ALPINE_ARCH}/$(wget https://mirror.xtom.com.hk/alpine/latest-stable/main/${ALPINE_ARCH}/ -q -O - | grep busybox-static | sed -e 's/^.*href="\([^"]*\)".*$/\1/g' | sort -V | tail -1)"
-	wget "${busybox}" -q -O - | tar zxf - -C ${TARGET_OUTPUT}/
-	rm -rf ${TARGET_OUTPUT}/.PKGINFO ${TARGET_OUTPUT}/.SIGN.RSA*
-	mv ${TARGET_OUTPUT}/bin ${TARGET_OUTPUT}/bbin
+	#local busybox="https://mirror.xtom.com.hk/alpine/latest-stable/main/${ALPINE_ARCH}/$(wget https://mirror.xtom.com.hk/alpine/latest-stable/main/${ALPINE_ARCH}/ -q -O - | grep busybox-static | sed -e 's/^.*href="\([^"]*\)".*$/\1/g' | sort -V | tail -1)"
+	#wget "${busybox}" -q -O - | tar zxf - -C ${TARGET_OUTPUT}/
+	#rm -rf ${TARGET_OUTPUT}/.PKGINFO ${TARGET_OUTPUT}/.SIGN.RSA*
+	#mv ${TARGET_OUTPUT}/bin ${TARGET_OUTPUT}/bbin
+	mkdir -p ${TARGET_OUTPUT}/bbin
+	cp -a /bin/busybox.static ${TARGET_OUTPUT}/bbin/
 	chroot_cmd /bbin/busybox.static --install -s /bbin
 	mkdir -p ${TARGET_OUTPUT}/bin
 	ln -s /bbin/busybox.static ${TARGET_OUTPUT}/bin/sh
@@ -585,6 +597,9 @@ fn_make_arch_common() {
 	if [ ! -e /usr/bin/curl ]; then
 		apk add curl
 	fi
+	if [ ! -e /bin/busybox.static ]; then
+		apk add busybox-static
+	fi
 
 	echo "Bootstrap"
 
@@ -722,14 +737,17 @@ fn_make_arch_common() {
 	[ -e /usr/bin/makepkg ] && sed -i -e 's/(( EUID == 0 ))/false /g' /usr/bin/makepkg
 
 	#busybox
-	set -x
-	local busybox="https://mirror.xtom.com.hk/alpine/latest-stable/main/${ALPINE_ARCH}/$(wget https://mirror.xtom.com.hk/alpine/latest-stable/main/${ALPINE_ARCH}/ -q -O - | grep busybox-static | sed -e 's/^.*href="\([^"]*\)".*$/\1/g' | sort -V | tail -1)"
-	echo ${busybox}
+	#set -x
+	#local busybox="https://mirror.xtom.com.hk/alpine/latest-stable/main/${ALPINE_ARCH}/$(wget https://mirror.xtom.com.hk/alpine/latest-stable/main/${ALPINE_ARCH}/ -q -O - | grep busybox-static | sed -e 's/^.*href="\([^"]*\)".*$/\1/g' | sort -V | tail -1)"
+	#echo ${busybox}
+	#mkdir -p ${TARGET_OUTPUT}/usr/local/busybox
+	#wget "${busybox}" -q -O - | tar zxf - -C ${TARGET_OUTPUT}/usr/local/busybox/
+	#mv ${TARGET_OUTPUT}/usr/local/busybox/bin/busybox.static ${TARGET_OUTPUT}/usr/local/busybox/busybox.static
+	#chmod +s ${TARGET_OUTPUT}/usr/local/busybox/busybox.static
+	#rm -rf ${TARGET_OUTPUT}/usr/local/busybox/bin ${TARGET_OUTPUT}/usr/local/busybox/.PKGINFO ${TARGET_OUTPUT}/usr/local/busybox/.SIGN.RSA*
 	mkdir -p ${TARGET_OUTPUT}/usr/local/busybox
-	wget "${busybox}" -q -O - | tar zxf - -C ${TARGET_OUTPUT}/usr/local/busybox/
-	mv ${TARGET_OUTPUT}/usr/local/busybox/bin/busybox.static ${TARGET_OUTPUT}/usr/local/busybox/busybox.static
+	cp /bin/busybox.static ${TARGET_OUTPUT}/usr/local/busybox/busybox.static
 	chmod +s ${TARGET_OUTPUT}/usr/local/busybox/busybox.static
-	rm -rf ${TARGET_OUTPUT}/usr/local/busybox/bin ${TARGET_OUTPUT}/usr/local/busybox/.PKGINFO ${TARGET_OUTPUT}/usr/local/busybox/.SIGN.RSA*
 	chroot_cmd /usr/local/busybox/busybox.static --install -s /usr/local/busybox
 	ln -s busybox.static ${TARGET_OUTPUT}/usr/local/busybox/busybox
 	cat << EOF > ${TARGET_OUTPUT}/etc/profile.d/busybox.sh
@@ -737,7 +755,7 @@ fn_make_arch_common() {
 
 export PATH=\${PATH}:/usr/local/busybox
 EOF
-	set +x
+	#set +x
 
 	echo
 
