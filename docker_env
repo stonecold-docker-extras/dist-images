@@ -1,11 +1,37 @@
 #!/usr/bin/env bash
 
-if [ -e /.dockerenv ]; then
+CONTAINER=
+if command -v podman >/dev/null 2>&1; then
+    CONTAINER="podman"
+elif command -v docker >/dev/null 2>&1; then
+    CONTAINER="docker"
+else
+    echo "docker 또는 podman이 필요합니다." >&2
+    exit 1
+fi
+
+if [ "${CONTAINER}" = "docker" -a -e /.dockerenv ]; then
 	echo "Cannot run in docker"
 	exit 1
+#elif [ "${CONTAINER}" = "podman " -a -e /.init ]; then
+elif [ "${CONTAINER}" = "podman " -a "${container}" = "podman" ]; then
+	echo "Cannot run in podman"
+	exit 1
 fi
-screen -S "docker dist-images" -m \
-docker run -i -t --rm --sig-proxy=false \
+
+if [ "${CONTAINER}" = "podman" ]; then
+	CONTAINER="sudo ${CONTAINER}"
+fi
+
+SESSION=
+if command -v tmux >/dev/null 2>&1; then
+    SESSION="tmux new-session -s 'docker-dist-images'"
+elif command -v screen >/dev/null 2>&1; then
+    SESSION="screen -S 'docker dist-images' -m"
+fi
+
+${SESSION} \
+${CONTAINER} run -i -t --rm --sig-proxy=false \
 	--privileged \
 	-e RUN_USER_NAME=$(id -un) \
 	-e RUN_USER_UID=$(id -u) \

@@ -8,7 +8,12 @@ fi
 LANG="C"
 LC_ALL="C"
 IS_DOCKER=N
+# docker
 if [ -e /.dockerenv -o ! -z "${BUILD_TAG}" ]; then
+	IS_DOCKER=Y
+fi
+# podman
+if [ "${container}" = "podman" ] || [ -e /.init ]; then
 	IS_DOCKER=Y
 fi
 
@@ -376,8 +381,10 @@ fn_make_entware() {
 	#busybox
 	apk fetch --arch ${ALPINE_ARCH} --no-cache --allow-untrust busybox-static
 	tar zxf busybox-static-*.apk -C ${TARGET_OUTPUT}/
-	rm -rf busybox-static-*.apk
+	rm -rf busybox-static-*.apk ${TARGET_OUTPUT}/.PKGINFO ${TARGET_OUTPUT}/.SIGN.RSA.*
 	mv ${TARGET_OUTPUT}/bin ${TARGET_OUTPUT}/bbin
+	mkdir -p ${TARGET_OUTPUT}/opt/bin
+	cp ${TARGET_OUTPUT}/bbin/busybox.static ${TARGET_OUTPUT}/opt/bin/busybox
 	chroot_cmd /bbin/busybox.static --install -s /bbin
 	mkdir -p ${TARGET_OUTPUT}/bin
 	ln -s /bbin/busybox.static ${TARGET_OUTPUT}/bin/sh
