@@ -1,6 +1,6 @@
-[submodule "extras"]
-	path = extras
-	url = git@bitbucket.org:forumi0721/docker-dist-extras.git
 [submodule "blobs"]
 	path = blobs
-	url = git@bitbucket.org:forumi0721/docker-dist-blobs.git
+	url = git@github.com:stonecold-docker-extras/dist-blobs.git
+[submodule "extras"]
+	path = extras
+	url = git@github.com:stonecold-docker-extras/dist-extras.git
