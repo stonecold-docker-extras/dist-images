@@ -102,6 +102,7 @@ fn_make_busybox() {
 	ALPINE_ARCH=${ALPINE_ARCH/armv7/armv7}
 
 	#busybox
+	apk update
 	apk fetch --arch ${ALPINE_ARCH} --no-cache --allow-untrust busybox-static
 	tar zxf busybox-static-*.apk -C ${TARGET_OUTPUT}/
 	rm -rf busybox-static-*.apk
@@ -132,8 +133,11 @@ fn_make_busybox() {
 		cp extras/${TARGET_QEMU} ${TARGET_OUTPUT}/usr/bin/
 
 		chroot_cmd() {
-			#QEMU_EXECVE=1 chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve "${@}"
-			chroot "${TARGET_OUTPUT}" "${@}"
+			if [ "${TARGET_BINFMT}" = "Y" ]; then
+				chroot "${TARGET_OUTPUT}" "${@}"
+			else
+				QEMU_EXECVE=1 chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve "${@}"
+			fi
 		}
 	else
 		chroot_cmd() {
@@ -221,12 +225,18 @@ fn_make_alpine() {
 		cp extras/${TARGET_QEMU} ${TARGET_OUTPUT}/usr/bin/
 
 		run_cmd() {
-			#QEMU_EXECVE=1 /usr/bin/${TARGET_QEMU} -execve "${@}"
-			"${@}"
+			if [ "${TARGET_BINFMT}" = "Y" ]; then
+				"${@}"
+			else
+				QEMU_EXECVE=1 /usr/bin/${TARGET_QEMU} -execve "${@}"
+			fi
 		}
 		chroot_cmd() {
-			#QEMU_EXECVE=1 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin LANG=C LC_ALL=C chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve "${@}"
-			PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin LANG=C LC_ALL=C chroot "${TARGET_OUTPUT}" "${@}"
+			if [ "${TARGET_BINFMT}" = "Y" ]; then
+				PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin LANG=C LC_ALL=C chroot "${TARGET_OUTPUT}" "${@}"
+			else
+				QEMU_EXECVE=1 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin LANG=C LC_ALL=C chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve "${@}"
+			fi
 		}
 	else
 		run_cmd() {
@@ -356,12 +366,6 @@ fn_make_entware() {
 		ENTWARE_VER="$(wget http://bin.entware.net/ -q -O - | grep 'armv7sf-' | tail -1 | sed -e 's/^.*a href="\([^"]*\)\/".*$/\1/g')"
 	fi
 
-	# Need busbox for bootstrapping
-	local ALPINE_ARCH=${TARGET_ARCH}
-	ALPINE_ARCH=${ALPINE_ARCH/x64/x86_64}
-	ALPINE_ARCH=${ALPINE_ARCH/aarch64/aarch64}
-	ALPINE_ARCH=${ALPINE_ARCH/armv7/armv7}
-
 	#qemu
 	mkdir -p ${TARGET_OUTPUT}/usr/bin
 	if [ ! -z "${TARGET_QEMU}" ]; then
@@ -369,8 +373,11 @@ fn_make_entware() {
 		cp extras/${TARGET_QEMU} ${TARGET_OUTPUT}/usr/bin/
 
 		chroot_cmd() {
-			#QEMU_EXECVE=1 PATH="/opt/sbin:/opt/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/bbin" chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve "${@}"
-			PATH="/opt/sbin:/opt/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/bbin" chroot "${TARGET_OUTPUT}" "${@}"
+			if [ "${TARGET_BINFMT}" = "Y" ]; then
+				PATH="/opt/sbin:/opt/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/bbin" chroot "${TARGET_OUTPUT}" "${@}"
+			else
+				QEMU_EXECVE=1 PATH="/opt/sbin:/opt/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/bbin" chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve "${@}"
+			fi
 		}
 	else
 		chroot_cmd() {
@@ -379,6 +386,11 @@ fn_make_entware() {
 	fi
 
 	#busybox
+	local ALPINE_ARCH=${TARGET_ARCH}
+	ALPINE_ARCH=${ALPINE_ARCH/x64/x86_64}
+	ALPINE_ARCH=${ALPINE_ARCH/aarch64/aarch64}
+	ALPINE_ARCH=${ALPINE_ARCH/armv7/armv7}
+	apk update
 	apk fetch --arch ${ALPINE_ARCH} --no-cache --allow-untrust busybox-static
 	tar zxf busybox-static-*.apk -C ${TARGET_OUTPUT}/
 	rm -rf busybox-static-*.apk ${TARGET_OUTPUT}/.PKGINFO ${TARGET_OUTPUT}/.SIGN.RSA.*
@@ -487,8 +499,11 @@ fn_make_entware() {
 		touch ${TARGET_OUTPUT}/opt/usr/lib/locale/locale-archive
 
 		if [ ! -z "${TARGET_QEMU}" ]; then
-			#QEMU_EXECVE=1 PATH="/opt/sbin:/opt/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "/opt/bin/opkg install locales"
-			chroot "${TARGET_OUTPUT}" /bin/sh -c "/opt/bin/opkg install locales"
+			if [ "${TARGET_BINFMT}" = "Y" ]; then
+				chroot "${TARGET_OUTPUT}" /bin/sh -c "/opt/bin/opkg install locales"
+			else
+				QEMU_EXECVE=1 PATH="/opt/sbin:/opt/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "/opt/bin/opkg install locales"
+			fi
 		else
 			chroot "${TARGET_OUTPUT}" /bin/sh -c "/opt/bin/opkg install locales"
 		fi
@@ -572,12 +587,14 @@ fn_make_arch() {
 	ARCH_ARCH=${ARCH_ARCH/armv7/armv7h}
 
 	if [ "${ARCH_ARCH}" = "x86_64" ]; then
-		PACMAN_MIRROR=http://ftp.lanet.kr/pub/archlinux
+		#PACMAN_MIRROR=http://ftp.lanet.kr/pub/archlinux
+		PACMAN_MIRROR=https://http.krfoss.org/archlinux
 		PACMAN_MIRRORLIST="Server = ${PACMAN_MIRROR}/\$repo/os/\$arch"
 		PACMAN_EXTRA_PKGS=""
 		ARCH_KEYRING="archlinux"
 	else
-		PACMAN_MIRROR=http://ca.us.mirror.archlinuxarm.org
+		#PACMAN_MIRROR=http://ca.us.mirror.archlinuxarm.org
+		PACMAN_MIRROR=https://http.krfoss.org/archlinux-arm
 		PACMAN_MIRRORLIST="Server = ${PACMAN_MIRROR}/\$arch/\$repo"
 		PACMAN_EXTRA_PKGS="archlinuxarm-keyring"
 		ARCH_KEYRING="archlinuxarm"
@@ -649,8 +666,11 @@ fn_make_arch_common() {
 		mkdir -p ${TARGET_OUTPUT}/usr/bin
 		cp extras/${TARGET_QEMU} ${TARGET_OUTPUT}/usr/bin/
 		chroot_cmd() {
-			#QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve "${@}"
-			PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" "${@}"
+			if [ "${TARGET_BINFMT}" = "Y" ]; then
+				PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" "${@}"
+			else
+				QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" arch-chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve "${@}"
+			fi
 		}
 	else
 		chroot_cmd() {
@@ -707,7 +727,8 @@ fn_make_arch_common() {
 	sed -i -e "s/\(Architecture =\) auto/\1 ${ARCH_ARCH}/g" ${TARGET_OUTPUT}/etc/pacman.conf
 	sed -i -e "s/#\(NoUpgrade   =\)/\1 \/etc\/pacman.d\/mirrorlist/g" ${TARGET_OUTPUT}/etc/pacman.conf
 	if [ "${ARCH_ARCH}" = "x86_64" ]; then
-		sed -i -e "/^#\[multilib\]/{N; s/#\(\[multilib\]\)\n#\(.*\)$/\1\n\2/g}" ${TARGET_OUTPUT}/etc/pacman.conf
+		#sed -i -e "/^#\[multilib\]/{N; s/#\(\[multilib\]\)\n#\(.*\)$/\1\n\2/g}" ${TARGET_OUTPUT}/etc/pacman.conf
+		sed -i -e 's/^#\[multilib\]/[multilib]/' -e '/^\[multilib\]$/,+1 s/^#Include =/Include =/' ${TARGET_OUTPUT}/etc/pacman.conf
 	fi
 
 	#locale
@@ -716,6 +737,7 @@ fn_make_arch_common() {
 	#	gzip -dk ${TARGET_OUTPUT}/usr/share/i18n/charmaps/UTF-8.gz
 	#fi
 	sed -i -e "s/#*[ ]*${TARGET_LOCALE}/${TARGET_LOCALE}/g" ${TARGET_OUTPUT}/etc/locale.gen
+	sed -i -e "s/#*[ ]*en_US.UTF-8/en_US.UTF-8/g" ${TARGET_OUTPUT}/etc/locale.gen
 	echo "LANG=${TARGET_LOCALE}" >> ${TARGET_OUTPUT}/etc/locale.conf
 	echo "LC_ALL=${TARGET_LOCALE}" >> ${TARGET_OUTPUT}/etc/locale.conf
 	chroot_cmd locale-gen
@@ -735,6 +757,11 @@ fn_make_arch_common() {
 	#busybox
 	#set -x
 	mkdir -p ${TARGET_OUTPUT}/usr/local/busybox
+	local ALPINE_ARCH=${TARGET_ARCH}
+	ALPINE_ARCH=${ALPINE_ARCH/x64/x86_64}
+	ALPINE_ARCH=${ALPINE_ARCH/aarch64/aarch64}
+	ALPINE_ARCH=${ALPINE_ARCH/armv7/armv7}
+	apk update
 	apk fetch --arch ${ALPINE_ARCH} --no-cache --allow-untrust busybox-static
 	tar zxf busybox-static-*.apk -C ${TARGET_OUTPUT}/usr/local/busybox/
 	rm -rf busybox-static-*.apk
@@ -784,7 +811,8 @@ fn_make_debian() {
 	DEBIAN_ARCH=${DEBIAN_ARCH/aarch64/arm64}
 	DEBIAN_ARCH=${DEBIAN_ARCH/armv7/armhf}
 
-	local DEBIAN_MIRROR=http://ftp.kr.debian.org/debian
+	#local DEBIAN_MIRROR=http://ftp.kr.debian.org/debian
+	local DEBIAN_MIRROR=https://http.krfoss.org/debian
 
 	local DEBIAN_COMPONENTS="main contrib non-free non-free-firmware"
 
@@ -810,10 +838,10 @@ fn_make_ubuntu() {
 	local DEBIAN_MIRROR=
 	if [ ! -z "${TARGET_QEMU}" ]; then
 		#DEBIAN_MIRROR=http://ports.ubuntu.com/ubuntu-ports
-		DEBIAN_MIRROR=http://ftp.kaist.ac.kr/ubuntu-ports
+		DEBIAN_MIRROR=https://http.krfoss.org/ubuntu
 	else
 		#DEBIAN_MIRROR=http://kr.archive.ubuntu.com/ubuntu
-		DEBIAN_MIRROR=http://ftp.kaist.ac.kr/ubuntu/
+		DEBIAN_MIRROR=https://http.krfoss.org/ubuntu
 	fi
 
 	local DEBIAN_COMPONENTS="main universe restricted multiverse"
@@ -860,8 +888,11 @@ fn_make_debian_common() {
 		cp extras/${TARGET_QEMU} ${TARGET_OUTPUT}/usr/bin/
 
 		chroot_cmd() {
-			#QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve "${@}"
-			PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true chroot "${TARGET_OUTPUT}" "${@}"
+			if [ "${TARGET_BINFMT}" = "Y" ]; then
+				PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true chroot "${TARGET_OUTPUT}" "${@}"
+			else
+				QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve "${@}"
+			fi
 		}
 	else
 		chroot_cmd() {
@@ -927,8 +958,10 @@ fn_make_debian_common() {
 		#deb ${DEBIAN_MIRROR} ${DEBIAN_DIST}-backports ${DEBIAN_COMPONENTS}
 		## deb-src ${DEBIAN_MIRROR} ${DEBIAN_DIST}-backports ${DEBIAN_COMPONENTS}
 
-		$([ "${DEBIAN_DIST}" = "sid" -o "${DEBIAN_DIST}" = "testing" ] && echo "#")deb http://security.debian.org/debian-security ${DEBIAN_DIST}-security ${DEBIAN_COMPONENTS}
-		$([ "${DEBIAN_DIST}" = "sid" -o "${DEBIAN_DIST}" = "testing" ] && echo "#")# deb-src http://security.debian.org/debian-security ${DEBIAN_DIST}-security ${DEBIAN_COMPONENTS}
+		#$([ "${DEBIAN_DIST}" = "sid" -o "${DEBIAN_DIST}" = "testing" ] && echo "#")deb http://security.debian.org/debian-security ${DEBIAN_DIST}-security ${DEBIAN_COMPONENTS}
+		#$([ "${DEBIAN_DIST}" = "sid" -o "${DEBIAN_DIST}" = "testing" ] && echo "#")# deb-src http://security.debian.org/debian-security ${DEBIAN_DIST}-security ${DEBIAN_COMPONENTS}
+		$([ "${DEBIAN_DIST}" = "sid" -o "${DEBIAN_DIST}" = "testing" ] && echo "#")deb https://http.krfoss.org/debian-security ${DEBIAN_DIST}-security ${DEBIAN_COMPONENTS}
+		$([ "${DEBIAN_DIST}" = "sid" -o "${DEBIAN_DIST}" = "testing" ] && echo "#")# deb-src https://http.krfoss.org/debian-security ${DEBIAN_DIST}-security ${DEBIAN_COMPONENTS}
 
 		EOF
 		if [ "${DEBIAN_DIST}" = "sid" -o "${DEBIAN_DIST}" = "testing" ] ; then
@@ -1158,8 +1191,11 @@ EOF
 		if [ -z "$(grep "^${TARGET_LOCALE}" ${TARGET_OUTPUT}/etc/locale.gen)" ]; then
 			if [ ! -z "${TARGET_QEMU}" ]; then
 				chroot_cmd() {
-					#QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve "${@}"
-					PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true chroot "${TARGET_OUTPUT}" "${@}"
+					if [ "${TARGET_BINFMT}" = "Y" ]; then
+						PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true chroot "${TARGET_OUTPUT}" "${@}"
+					else
+						QEMU_EXECVE=1 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" LANG=C LC_ALL=C DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true chroot "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve "${@}"
+					fi
 				}
 			else
 				chroot_cmd() {
@@ -1222,15 +1258,21 @@ EOF
 
 		if [ "${TARGET_DISTRO}" = "debian" -o "${TARGET_DISTRO}" = "ubuntu" -o "${TARGET_DISTRO}" = "entware" ]; then
 			if [ ! -z "${TARGET_QEMU}" ]; then
-				#QEMU_EXECVE=1 PATH="${PATH_CHROOT}" LANG=C LC_ALL=C ${CHROOT_CMD} "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "docker-install -r -u -f -c"
-				PATH="${PATH_CHROOT}" LANG=C LC_ALL=C ${CHROOT_CMD} "${TARGET_OUTPUT}" /bin/sh -c "docker-install -r -u -f -c"
+				if [ "${TARGET_BINFMT}" = "Y" ]; then
+					PATH="${PATH_CHROOT}" LANG=C LC_ALL=C ${CHROOT_CMD} "${TARGET_OUTPUT}" /bin/sh -c "docker-install -r -u -f -c"
+				else
+					QEMU_EXECVE=1 PATH="${PATH_CHROOT}" LANG=C LC_ALL=C ${CHROOT_CMD} "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "docker-install -r -u -f -c"
+				fi
 			else
 				PATH="${PATH_CHROOT}" LANG=C LC_ALL=C ${CHROOT_CMD} "${TARGET_OUTPUT}" /bin/sh -c "docker-install -r -u -f -c"
 			fi
 		else
 			if [ ! -z "${TARGET_QEMU}" ]; then
-				#QEMU_EXECVE=1 PATH="${PATH_CHROOT}" LANG=C LC_ALL=C ${CHROOT_CMD} "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "docker-install -r -u -c"
-				PATH="${PATH_CHROOT}" LANG=C LC_ALL=C ${CHROOT_CMD} "${TARGET_OUTPUT}" /bin/sh -c "docker-install -r -u -c"
+				if [ "${TARGET_BINFMT}" = "Y" ]; then
+					PATH="${PATH_CHROOT}" LANG=C LC_ALL=C ${CHROOT_CMD} "${TARGET_OUTPUT}" /bin/sh -c "docker-install -r -u -c"
+				else
+					QEMU_EXECVE=1 PATH="${PATH_CHROOT}" LANG=C LC_ALL=C ${CHROOT_CMD} "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "docker-install -r -u -c"
+				fi
 			else
 				PATH="${PATH_CHROOT}" LANG=C LC_ALL=C ${CHROOT_CMD} "${TARGET_OUTPUT}" /bin/sh -c "docker-install -r -u -c"
 			fi
@@ -1239,18 +1281,24 @@ EOF
 		#archlinux update-ca-trust
 		if [ -e "${TARGET_OUTPUT}/etc/arch-release" ]; then
 			if [ ! -z "${TARGET_QEMU}" ]; then
-				#QEMU_EXECVE=1 PATH="${PATH_CHROOT}" LANG=C LC_ALL=C ${CHROOT_CMD} "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "update-ca-trust"
-				PATH="${PATH_CHROOT}" LANG=C LC_ALL=C ${CHROOT_CMD} "${TARGET_OUTPUT}" /bin/sh -c "update-ca-trust"
+				if [ "${TARGET_BINFMT}" = "Y" ]; then
+					PATH="${PATH_CHROOT}" LANG=C LC_ALL=C ${CHROOT_CMD} "${TARGET_OUTPUT}" /bin/sh -c "update-ca-trust"
+				else
+					QEMU_EXECVE=1 PATH="${PATH_CHROOT}" LANG=C LC_ALL=C ${CHROOT_CMD} "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "update-ca-trust"
+				fi
 			else
 				PATH="${PATH_CHROOT}" LANG=C LC_ALL=C ${CHROOT_CMD} "${TARGET_OUTPUT}" /bin/sh -c "update-ca-trust"
 			fi
 		fi
 
-		#alpinelinux update baselayout
+		##alpinelinux update baselayout
 		#if [ -e "${TARGET_OUTPUT}/etc/apk/world" ]; then
 		#	if [ ! -z "${TARGET_QEMU}" ]; then
-		#		#QEMU_EXECVE=1 PATH="${PATH_CHROOT}" LANG=C LC_ALL=C ${CHROOT_CMD} "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "apk --no-cache --allow-untrusted --quiet fetch alpine-base ; cat /alpine-base*.apk | tar -zxf - -C / etc/ ; rm -rf /alpine-base*.apk"
-		#		PATH="${PATH_CHROOT}" LANG=C LC_ALL=C ${CHROOT_CMD} "${TARGET_OUTPUT}" /bin/sh -c "apk --no-cache --allow-untrusted --quiet fetch alpine-base ; cat /alpine-base*.apk | tar -zxf - -C / etc/ ; rm -rf /alpine-base*.apk"
+		#		if [ "${TARGET_BINFMT}" = "Y" ]; then
+		#			PATH="${PATH_CHROOT}" LANG=C LC_ALL=C ${CHROOT_CMD} "${TARGET_OUTPUT}" /bin/sh -c "apk --no-cache --allow-untrusted --quiet fetch alpine-base ; cat /alpine-base*.apk | tar -zxf - -C / etc/ ; rm -rf /alpine-base*.apk"
+		#		else
+		#			QEMU_EXECVE=1 PATH="${PATH_CHROOT}" LANG=C LC_ALL=C ${CHROOT_CMD} "${TARGET_OUTPUT}" /usr/bin/${TARGET_QEMU} -execve /bin/sh -c "apk --no-cache --allow-untrusted --quiet fetch alpine-base ; cat /alpine-base*.apk | tar -zxf - -C / etc/ ; rm -rf /alpine-base*.apk"
+		#		fi
 		#	else
 		#		PATH="${PATH_CHROOT}" LANG=C LC_ALL=C ${CHROOT_CMD} "${TARGET_OUTPUT}" /bin/sh -c "apk --no-cache --allow-untrusted --quiet fetch alpine-base ; cat /alpine-base*.apk | tar -zxf - -C / etc/ ; rm -rf /alpine-base*.apk"
 		#	fi
@@ -1501,10 +1549,17 @@ TARGET_PUSH=${TARGET_PUSH:-N}
 if [ "${TARGET_PUSH}" = "Y" ]; then
 	TARGET_IMPORT=Y
 fi
+TARGET_BINFMT=N
 if [ "${TARGET_ARCH}" = "aarch64" ]; then
 	TARGET_QEMU=qemu-aarch64-static
+	if [ -e /proc/sys/fs/binfmt_misc/qemu-aarch64 ]; then
+		TARGET_BINFMT=Y
+	fi
 elif [ "${TARGET_ARCH}" = "armv7" ]; then
 	TARGET_QEMU=qemu-arm-static
+	if [ -e /proc/sys/fs/binfmt_misc/qemu-arm ]; then
+		TARGET_BINFMT=Y
+	fi
 fi
 QUIET=${QUIET:-N}
 if [ "${QUIET}" = "Y" ]; then
@@ -1556,6 +1611,7 @@ if [ "${DEBUG}" = "Y" -o "${VERBOSE}" = "Y" ]; then
 fi
 
 if [ -e /sbin/apk ]; then
+	apk update
 	apk add util-linux losetup
 fi
 
